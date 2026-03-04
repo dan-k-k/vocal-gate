@@ -1,0 +1,10 @@
+torch
+torchaudio
+onnx
+onnxruntime
+librosa
+pyyaml
+tqdm
+onnxscript
+matplotlib
+soundfile

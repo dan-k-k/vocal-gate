@@ -1,0 +1,46 @@
+# .gitignore
+
+# OS & Editor
+**/.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Python / Environment
+__pycache__/
+*.py[cod]
+*$py.class
+ml_pipeline/.venv/
+
+# ⚠️ THE BIG ONES: Datasets & Audio
+ml_pipeline/ESC-50-master/
+ml_pipeline/FSD50K/
+ml_pipeline/LibriSpeech/
+ml_pipeline/data/
+*.wav
+*.mp3
+*.flac
+*.asd
+
+# ML Models & Logs
+*.pt
+*.pth
+*.onnx
+*.onnx.data
+ml_pipeline/models/
+
+# C++ / JUCE Plugin
+plugin/build/
+build/
+
+# Compiled Binaries
+*.vst3
+*.component
+*.dll
+*.so
+*.a
+
+# ONNX Runtime (Ignore the folder, but keep the specific dylib if you rely on it locally)
+plugin/onnxruntime/lib/*
+!plugin/onnxruntime/lib/libonnxruntime.dylib
+
