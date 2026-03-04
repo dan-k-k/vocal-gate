@@ -1,0 +1,59 @@
+# .github/workflows/main.yml
+name: Vocal Gate CI # 1. Changed the name!
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  # Job 1: Python ML Tests
+  test-python:
+    name: Python Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest torch torchaudio soundfile librosa scikit-learn matplotlib numpy onnxruntime
+
+    - name: Run PyTest
+      # 3. Just ensure your repository actually has a tests/Python/ folder!
+      run: pytest tests/Python/
+
+  # Job 2: C++ FIFO & Buffer Tests
+  test-cpp:
+    name: C++ Unit Tests
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout Code with Submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive 
+
+    - name: Bypass CMake ONNX Requirement
+      run: |
+        # 4. Changed the dummy file name to match your Vocal Gate ONNX file
+        mkdir -p plugin # Just in case the folder isn't tracked yet
+        touch plugin/vocalgate_int8.onnx
+
+    - name: Configure CMake
+      run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
+
+    - name: Compile Tests Only
+      run: cmake --build build --target RunCPPTests --parallel 4 
+
+    - name: Run CTest
+      run: ctest --test-dir build --output-on-failure
+
