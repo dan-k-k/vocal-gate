@@ -11,6 +11,8 @@ import onnxruntime as ort
 from dataset import VocalGateDataset
 from model import VocalGateModel
 from plots import plot_confusion_matrix
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="torch.functional")
 
 DATA_DIR = "./data"
 IMAGES_DIR = "../images"
@@ -20,6 +22,7 @@ MODELS_TO_TEST = {
     "Pruned": "./models/vocalgate_pruned.pt",
     "Quantized": "../plugin/vocalgate_int8.onnx" # <--- Update this path!
 }
+threshold=0.5; print(f"Threshold={threshold}")
 
 def evaluate_single_model(model_name, model_path, test_loader, device, mfcc_transform):
     """Evaluates a single model and returns its scores and metrics."""
@@ -45,7 +48,7 @@ def evaluate_single_model(model_name, model_path, test_loader, device, mfcc_tran
             y_scores.extend(probs.flatten())
             y_true.extend(labels.cpu().numpy().flatten())
 
-    y_pred = [1 if score >= 0.5 else 0 for score in y_scores] 
+    y_pred = [1 if score >= threshold else 0 for score in y_scores] 
 
     precision = precision_score(y_true, y_pred, zero_division=0)
     recall = recall_score(y_true, y_pred, zero_division=0)
@@ -91,11 +94,11 @@ def evaluate_onnx_model(model_name, model_path, test_loader, mfcc_transform, dev
             logit_clipped = np.clip(logit, -500, 500) 
             prob = 1 / (1 + np.exp(-logit_clipped))
             
-            y_scores.extend(prob)
+            y_scores.append(prob.item())
             
         y_true.extend(labels_np)
 
-    y_pred = [1 if score >= 0.5 else 0 for score in y_scores] 
+    y_pred = [1 if score >= threshold else 0 for score in y_scores] 
 
     precision = precision_score(y_true, y_pred, zero_division=0)
     recall = recall_score(y_true, y_pred, zero_division=0)

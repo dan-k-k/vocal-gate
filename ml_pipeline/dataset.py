@@ -88,31 +88,41 @@ class VocalGateDataset(Dataset):
         file_path, label, _ = self.samples[idx]
         threshold_db = -18.0 if 'breathing' in file_path else -10.0
         
-        # Pass just the file path, our helper handles the rest in RAM
+        # 1. Get the base audio chunk
         waveform = self._get_active_chunk(file_path, threshold_db)
 
-        if self.augment and random.random() < 0.6: 
-            if label == 1:
-                bg_file, _ = random.choice(self.speech_files)
-                bg_waveform = self._get_active_chunk(bg_file, -24.0)
-                bleed = random.uniform(0.05, 0.2) 
-                waveform = waveform + (bg_waveform * bleed)
-                
-            elif label == 0:
-                artifact_files = [s for s in self.samples if s[1] == 1]
-                bg_file, _, _ = random.choice(artifact_files)
-                
-                if random.random() < 0.5:
+        # 2. Apply all augmentations ONLY if we are in training mode
+        if self.augment: 
+            
+            # --- AUGMENTATION A: 60% Chance of Background Bleed ---
+            if random.random() < 0.6: 
+                if label == 1:
+                    bg_file, _ = random.choice(self.speech_files)
                     bg_waveform = self._get_active_chunk(bg_file, -24.0)
                     bleed = random.uniform(0.05, 0.2) 
                     waveform = waveform + (bg_waveform * bleed)
-                else:
-                    bg_waveform = self._get_active_chunk(bg_file, -10.0)
-                    mix = random.uniform(0.5, 0.9) 
-                    waveform = waveform + (bg_waveform * mix)
+                    
+                elif label == 0:
+                    artifact_files = [s for s in self.samples if s[1] == 1]
+                    bg_file, _, _ = random.choice(artifact_files)
+                    
+                    if random.random() < 0.5:
+                        bg_waveform = self._get_active_chunk(bg_file, -24.0)
+                        bleed = random.uniform(0.05, 0.2) 
+                        waveform = waveform + (bg_waveform * bleed)
+                    else:
+                        bg_waveform = self._get_active_chunk(bg_file, -10.0)
+                        mix = random.uniform(0.5, 0.9) 
+                        waveform = waveform + (bg_waveform * mix)
             
+            # --- AUGMENTATION B: 100% Chance of Random Gain (Training Only) ---
+            gain_db = random.uniform(-6.0, 6.0) 
+            linear_gain = 10 ** (gain_db / 20.0)
+            waveform = waveform * linear_gain
+            
+            # 3. Final safety clamp to prevent digital clipping after adding/boosting
             waveform = torch.clamp(waveform, -1.0, 1.0)
 
-        # ISSUE 1 FIX: Return RAW waveform. NO MFCCs computed here!
+        # Return RAW waveform
         return waveform, torch.tensor([label], dtype=torch.float32)
     
