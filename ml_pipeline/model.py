@@ -24,7 +24,7 @@ class DepthwiseSeparableConv(nn.Module):
 class VocalGateModel(nn.Module):
     def __init__(self, input_shape=(1, 40, 61), num_classes=1):
         """
-        input_shape: (Channels, MFCC_Bins, Time_Frames). 
+        input_shape: (Channels, Mel_Bins, Time_Frames). 
         Default (1, 40, 61) corresponds to 1 sec of 16kHz audio with hop_length=256 and 40 Mels.
         """
         super(VocalGateModel, self).__init__()

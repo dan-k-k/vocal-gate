@@ -1,6 +1,7 @@
 # ml_pipeline/evaluate.py
 import os
 import torch
+import torch.nn as nn # <--- Added nn for the Sequential block
 import torchaudio.transforms as T
 from torch.utils.data import DataLoader
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_curve, auc, confusion_matrix
@@ -24,7 +25,7 @@ MODELS_TO_TEST = {
 }
 threshold=0.5; print(f"Threshold={threshold}")
 
-def evaluate_single_model(model_name, model_path, test_loader, device, mfcc_transform):
+def evaluate_single_model(model_name, model_path, test_loader, device, log_mel_transform):
     """Evaluates a single model and returns its scores and metrics."""
     print(f"\nEvaluating: {model_name}...")
     
@@ -42,7 +43,7 @@ def evaluate_single_model(model_name, model_path, test_loader, device, mfcc_tran
     with torch.no_grad():
         for features, labels in test_loader:
             features = features.to(device)
-            features = mfcc_transform(features) # <-- ADDED THIS LINE
+            features = log_mel_transform(features)
             logits = model(features).squeeze(-1)
             probs = torch.sigmoid(logits).cpu().numpy()
             y_scores.extend(probs.flatten())
@@ -63,7 +64,7 @@ def evaluate_single_model(model_name, model_path, test_loader, device, mfcc_tran
 
     return y_true, y_scores
 
-def evaluate_onnx_model(model_name, model_path, test_loader, mfcc_transform, device):
+def evaluate_onnx_model(model_name, model_path, test_loader, log_mel_transform, device):
     """Evaluates an ONNX model using the ONNX Runtime engine."""
     print(f"\nEvaluating: {model_name}...")
     
@@ -78,7 +79,7 @@ def evaluate_onnx_model(model_name, model_path, test_loader, mfcc_transform, dev
 
     for features, labels in test_loader:
         features = features.to(device)      # <-- ADDED THIS LINE
-        features = mfcc_transform(features) # <-- ADDED THIS LINE
+        features = log_mel_transform(features) # <-- ADDED THIS LINE
         
         features_np = features.cpu().numpy()
         labels_np = labels.cpu().numpy().flatten()
@@ -117,10 +118,17 @@ def main():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Evaluating on: {device}")
 
-    mfcc_transform = T.MFCC(
-        sample_rate=16000, n_mfcc=40,
-        melkwargs={"n_fft": 512, "hop_length": 256, "n_mels": 40, "center": False, "window_fn": torch.hann_window}
-    ).to(device) # <-- ADDED .to(device)
+    log_mel_transform = nn.Sequential(
+        T.MelSpectrogram(
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            n_mels=40,
+            center=False,
+            window_fn=torch.hann_window
+        ),
+        T.AmplitudeToDB(stype='power', top_db=80.0)
+    ).to(device)
 
     # REMOVED transform=mfcc_transform
     test_dataset = VocalGateDataset(split_dir=os.path.join(DATA_DIR, "test"), augment=False) 
@@ -137,9 +145,9 @@ def main():
         
         # Route to the correct evaluator based on file type
         if model_path.endswith('.onnx'):
-            results = evaluate_onnx_model(model_name, model_path, test_loader, mfcc_transform, device) # <-- PASSED NEW ARGS
+            results = evaluate_onnx_model(model_name, model_path, test_loader, log_mel_transform, device) 
         else:
-            results = evaluate_single_model(model_name, model_path, test_loader, device, mfcc_transform) # <-- PASSED NEW ARGS
+            results = evaluate_single_model(model_name, model_path, test_loader, device, log_mel_transform)
         
         if results:
             y_true, y_scores = results

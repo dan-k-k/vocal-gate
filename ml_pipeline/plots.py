@@ -2,8 +2,9 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import csv # <--- ADD THIS
+import csv 
 import torch
+import torch.nn as nn # <--- Added nn here
 import torchaudio
 import torchaudio.transforms as T
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -52,9 +53,9 @@ def plot_training_curve(csv_file="training_log.csv", output_img="loss_curve.png"
     print(f"📈 Loss curve saved to: '{out_path}'")
     plt.close()
 
-def save_audio_and_features(waveform, mfcc, sample_rate, label):
+def save_audio_and_features(waveform, log_mel, sample_rate, label):
     waveform_np = waveform.squeeze().numpy()
-    mfcc_np = mfcc.squeeze().numpy()
+    log_mel_np = log_mel.squeeze().numpy()
     
     # ---------------------------------------------------------
     # Plot 1: Raw Waveform
@@ -75,19 +76,19 @@ def save_audio_and_features(waveform, mfcc, sample_rate, label):
     plt.close(fig1)
 
     # ---------------------------------------------------------
-    # Plot 2: MFCC Spectrogram
+    # Plot 2: Log Mel Spectrogram
     # ---------------------------------------------------------
     fig2, ax2 = plt.subplots(figsize=(10, 3))
-    cax = ax2.imshow(mfcc_np, origin='lower', aspect='auto', cmap='magma')
+    cax = ax2.imshow(log_mel_np, origin='lower', aspect='auto', cmap='magma')
     
-    ax2.set_title(f"MFCC Features: '{label}' ({mfcc_np.shape[0]} bins x {mfcc_np.shape[1]} frames)")
-    ax2.set_ylabel("MFCC Bins")
+    ax2.set_title(f"Log Mel Features: '{label}' ({log_mel_np.shape[0]} bins x {log_mel_np.shape[1]} frames)")
+    ax2.set_ylabel("Mel Bins")
     ax2.set_xlabel("Time Frames")
     fig2.colorbar(cax, ax=ax2, format="%+2.0f")
         
-    save_path2 = os.path.join(IMAGES_DIR, f"mfcc_{label}.png")
+    save_path2 = os.path.join(IMAGES_DIR, f"log_mel_{label}.png")
     fig2.savefig(save_path2, dpi=300, bbox_inches='tight')
-    print(f"MFCC plot saved to: {save_path2}")
+    print(f"Log Mel plot saved to: {save_path2}")
     plt.close(fig2)
 
 
@@ -163,9 +164,16 @@ def plot_in_action_gate(model_path, speech_path, artifact_path, threshold=0.5):
     window_size = 16000 # 1 second window
     hop_size = 4000     # 250ms jumps for a smoother probability curve
     
-    mfcc_transform = T.MFCC(
-        sample_rate=16000, n_mfcc=40,
-        melkwargs={"n_fft": 512, "hop_length": 256, "n_mels": 40, "center": False, "window_fn": torch.hann_window}
+    log_mel_transform = nn.Sequential(
+        T.MelSpectrogram(
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            n_mels=40,
+            center=False,
+            window_fn=torch.hann_window
+        ),
+        T.AmplitudeToDB(stype='power', top_db=80.0)
     )
 
     probs = []
@@ -174,7 +182,7 @@ def plot_in_action_gate(model_path, speech_path, artifact_path, threshold=0.5):
     with torch.no_grad():
         for start in range(0, total_samples - window_size, hop_size):
             chunk = combined_audio[:, start:start + window_size]
-            features = mfcc_transform(chunk).unsqueeze(0) # Add batch dim
+            features = log_mel_transform(chunk).unsqueeze(0) # Add batch dim
             
             logit = model(features).squeeze(-1)
             prob = torch.sigmoid(logit).item()

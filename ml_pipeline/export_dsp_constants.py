@@ -25,25 +25,20 @@ def main():
     print("🧪 Initializing exact PyTorch MFCC Transform...")
     
     # Use the exact same parameters from your training script!
-    mfcc_transform = T.MFCC(
+    mel_transform = T.MelSpectrogram(
         sample_rate=16000,
-        n_mfcc=40,
-        melkwargs={
-            "n_fft": 512,
-            "hop_length": 256,
-            "n_mels": 40,
-            "center": False,
-            "window_fn": torch.hann_window
-        }
+        n_fft=512,
+        hop_length=256,
+        n_mels=40,
+        center=False,
+        window_fn=torch.hann_window
     )
 
     # 1. Steal the Mel Filterbank Matrix
     # Shape: [257, 40] (Freq bins x Mel bins)
-    mel_fb = mfcc_transform.MelSpectrogram.mel_scale.fb
+    mel_fb = mel_transform.mel_scale.fb
     
-    # 2. Steal the DCT Matrix
-    # Shape: [40, 40] (Mel bins x MFCC bins)
-    dct_mat = mfcc_transform.dct_mat
+    # 2. (No DCT matrix needed for Log Mels!)
     
     # 3. Steal the Window Function
     # Shape: [512]
@@ -56,7 +51,6 @@ def main():
     
     cpp_code += tensor_to_cpp_array(window, "hannWindow512", is_2d=False) + "\n"
     cpp_code += tensor_to_cpp_array(mel_fb, "melFilterBank", is_2d=True) + "\n"
-    cpp_code += tensor_to_cpp_array(dct_mat, "dctMatrix", is_2d=True) + "\n"
     
     cpp_code += "} // namespace DSPConstants\n"
 
@@ -71,7 +65,6 @@ def main():
 
     print(f"✅ Success! C++ constants saved to: {output_path}")
     print(f"   -> Mel Filterbank shape: {mel_fb.shape}")
-    print(f"   -> DCT Matrix shape: {dct_mat.shape}")
 
 if __name__ == "__main__":
     main()

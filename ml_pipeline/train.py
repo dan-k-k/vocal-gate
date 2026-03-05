@@ -12,13 +12,13 @@ import shutil
 from dataset import VocalGateDataset
 from model import VocalGateModel
 
-def process_batch(features, labels, model, criterion, device, mfcc_transform):
+def process_batch(features, labels, model, criterion, device, feature_transform):
     # 1. Move raw audio to the GPU
     features = features.to(device)
     labels = labels.float().to(device)
     
-    # ISSUE 1 FIX: Apply the heavy MFCC math to the whole batch at once on the GPU
-    features = mfcc_transform(features)
+    # Apply the Log Mel Spectrogram math to the whole batch at once on the GPU
+    features = feature_transform(features)
 
     outputs = model(features)
     loss = criterion(outputs, labels)
@@ -45,17 +45,18 @@ def train():
     learning_rate = 1e-3
     data_dir = "./data"
 
-    # ISSUE 1 FIX: Initialize the transform and send it to the GPU
-    mfcc_transform = T.MFCC(
-        sample_rate=16000, 
-        n_mfcc=40,
-        melkwargs={
-            "n_fft": 512,
-            "hop_length": 256,
-            "n_mels": 40, 
-            "center": False, 
-            "window_fn": torch.hann_window
-        }
+    # NEW FIX: Initialize the Log Mel transform and send it to the GPU
+    # We use nn.Sequential to chain the Mel generation and the Decibel conversion together
+    feature_transform = nn.Sequential(
+        T.MelSpectrogram(
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            n_mels=40,
+            center=False,
+            window_fn=torch.hann_window
+        ),
+        T.AmplitudeToDB(stype='power', top_db=80.0)
     ).to(device)
 
     # Initialize datasets WITHOUT the transform argument
@@ -116,8 +117,8 @@ def train():
 
             for features, labels in train_bar:
                 optimizer.zero_grad()
-                # Pass mfcc_transform into the batch processor
-                loss, tp, fp, fn = process_batch(features, labels, model, criterion, device, mfcc_transform)
+                # Pass feature_transform into the batch processor
+                loss, tp, fp, fn = process_batch(features, labels, model, criterion, device, feature_transform)
                 loss.backward()
                 optimizer.step()
 
@@ -138,7 +139,7 @@ def train():
 
             with torch.no_grad():
                 for features, labels in val_bar:
-                    loss, tp, fp, fn = process_batch(features, labels, model, criterion, device, mfcc_transform)
+                    loss, tp, fp, fn = process_batch(features, labels, model, criterion, device, feature_transform)
                     val_loss += loss.item()
                     val_tp += tp.item()
                     val_fp += fp.item()

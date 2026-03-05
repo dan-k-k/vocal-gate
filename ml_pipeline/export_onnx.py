@@ -48,7 +48,7 @@ def export_to_onnx():
         export_params=True,
         opset_version=18, 
         do_constant_folding=True,
-        input_names=['input_mfcc'],  
+        input_names=['input_log_mel'],  # <--- Renamed to match our new features
         output_names=['gate_logit'], 
     )
     

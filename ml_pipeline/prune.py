@@ -57,8 +57,18 @@ def main():
     # 3. Setup Fine-Tuning (Recovery Phase)
     print("🩹 Starting recovery fine-tuning...")
     data_dir = "./data"
-    mfcc_transform = T.MFCC(sample_rate=16000, n_mfcc=40,
-        melkwargs={"n_fft": 512, "hop_length": 256, "n_mels": 40, "center": False, "window_fn": torch.hann_window}).to(device)
+    
+    log_mel_transform = nn.Sequential(
+        T.MelSpectrogram(
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            n_mels=40,
+            center=False,
+            window_fn=torch.hann_window
+        ),
+        T.AmplitudeToDB(stype='power', top_db=80.0)
+    ).to(device)
     
     # We only need the train loader for a quick recovery
     train_dataset = VocalGateDataset(split_dir=os.path.join(data_dir, "train"), augment=True)
@@ -78,7 +88,7 @@ def main():
         for features, labels in train_bar:
             optimizer.zero_grad()
             # FIX: Catch the extra return values and pass the transform!
-            loss, _, _, _ = process_batch(features, labels, model, criterion, device, mfcc_transform)
+            loss, _, _, _ = process_batch(features, labels, model, criterion, device, log_mel_transform)
             loss.backward()
             optimizer.step()
 
