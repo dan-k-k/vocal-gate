@@ -28,6 +28,8 @@ ml_pipeline/data/
 *.onnx
 *.onnx.data
 ml_pipeline/models/
+ml_pipeline/plot_dataset_energy.py
+ml_pipeline/render_final_video.py
 
 # C++ / JUCE Plugin
 plugin/build/
@@ -44,3 +46,6 @@ build/
 plugin/onnxruntime/lib/*
 !plugin/onnxruntime/lib/libonnxruntime.dylib
 
+# Generated Media & Plots
+*.mp4
+temp_*
