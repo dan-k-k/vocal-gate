@@ -53,7 +53,7 @@ def export_to_onnx():
     )
     
     onnx_model = onnx.load(fp32_onnx_path)
-    onnx.save_model(onnx_model, fp32_onnx_path, save_as_external_data=False, all_tensors_to_one_file=True)
+    onnx.save_model(onnx_model, fp32_onnx_path)
 
     print("FP32 Export Complete. Pre-processing for quantization...")
 
@@ -61,7 +61,8 @@ def export_to_onnx():
     shape_inference.quant_pre_process(
         input_model_path=fp32_onnx_path,
         output_model_path=preprocessed_onnx_path,
-        skip_optimization=False
+        skip_optimization=False,
+        save_as_external_data=False
     )
 
     print("Pre-processing Complete. Starting ONNX INT8 Quantization...")
@@ -70,7 +71,8 @@ def export_to_onnx():
     quantize_dynamic(
         model_input=preprocessed_onnx_path,
         model_output=int8_onnx_path,
-        weight_type=QuantType.QUInt8 
+        weight_type=QuantType.QUInt8,
+        use_external_data_format=False 
     )
 
     size_pt = print_size_of_model(weights_path)

@@ -2,6 +2,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "DSPConstants.h" // <--- ADD THIS
+#include <cstring>   // For std::memset, std::memcpy, std::memmove
+#include <cmath>     // For std::log10, std::exp
+#include <algorithm> // For std::max
 
 VocalGateProcessor::VocalGateProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -16,31 +19,63 @@ VocalGateProcessor::VocalGateProcessor()
        juce::Thread ("ONNX_ML_Thread") 
 #endif
 {
-    // Initialize ONNX Runtime options
+    // Register the parameter with the DAW (ID, Name, Min, Max, Default)
+    thresholdParam = new juce::AudioParameterFloat("threshold", "Threshold", 0.01f, 0.99f, 0.50f);
+    addParameter(thresholdParam);
+
     Ort::SessionOptions sessionOptions;
     sessionOptions.SetIntraOpNumThreads(1);
     sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-    // Look for the model on the Mac Desktop
-    juce::File modelFile = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
-                             .getChildFile("vocalgate_int8.onnx");
+    // --- FIX: CROSS-PLATFORM PATH HANDLING ---
+    juce::File systemLibraryDir = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
+    juce::File manufacturerFolder;
+
+#if JUCE_MAC
+    // Mac: /Library/Application Support/DanK
+    manufacturerFolder = systemLibraryDir.getChildFile("Application Support").getChildFile("DanK");
+#else
+    // Windows: C:\ProgramData\DanK
+    manufacturerFolder = systemLibraryDir.getChildFile("DanK");
+#endif
+
+    juce::File pluginFolder = manufacturerFolder.getChildFile("VocalGate");
+    juce::File modelFile = pluginFolder.getChildFile("vocalgate_int8.onnx");
+
+    // --- FIX: STANDARDIZED LOGGING ---
+    // We REMOVED the custom VocalGate_Debug.txt file logic. 
+    // Now we use juce::Logger so it doesn't crash on standard Windows user accounts!
 
     if (modelFile.existsAsFile())
     {
-        // Load the model into memory
-        onnxSession = std::make_unique<Ort::Session>(
-            onnxEnv, 
-            modelFile.getFullPathName().toStdString().c_str(), 
-            sessionOptions
-        );
+        try {
+            onnxSession = std::make_unique<Ort::Session>(
+                onnxEnv, 
+#if JUCE_WINDOWS
+                modelFile.getFullPathName().toWideCharPointer(), // Windows ONNX requires wide chars
+#else
+                modelFile.getFullPathName().toStdString().c_str(), // Mac uses standard C-strings
+#endif
+                sessionOptions
+            );
+            
+            Ort::AllocatorWithDefaultOptions allocator;
+            auto expectedInput = onnxSession->GetInputNameAllocated(0, allocator);
+            auto expectedOutput = onnxSession->GetOutputNameAllocated(0, allocator);
+            
+            juce::String msg = "✅ ONNX Loaded! Expected Input Name: " + juce::String(expectedInput.get()) + 
+                               ", Expected Output Name: " + juce::String(expectedOutput.get());
+            
+            juce::Logger::writeToLog(msg); 
+        } 
+        catch (const Ort::Exception& e) {
+            juce::Logger::writeToLog("🚨 ONNX LOAD CRASH: " + juce::String(e.what()));
+        }
     }
     else
     {
-        // If it can't find the file, we will print a warning to the console
-        juce::Logger::writeToLog("🚨 ERROR: Could not find vocalgate_int8.onnx on the Desktop!");
+        juce::Logger::writeToLog("🚨 ERROR: Could not find ONNX at: " + modelFile.getFullPathName());
     }
-
-    startThread (juce::Thread::Priority::lowest);
 }
 
 VocalGateProcessor::~VocalGateProcessor()
@@ -51,18 +86,50 @@ VocalGateProcessor::~VocalGateProcessor()
 
 void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    dawSampleRate = sampleRate;
+    // Stop the thread if it's already running from a previous prepareToPlay call
+    if (isThreadRunning())
+        stopThread(2000); 
 
-    // Make the FIFO large enough to hold 2 seconds of audio at the DAW's sample rate
-    // This gives our background thread plenty of breathing room.
+    dawSampleRate = sampleRate;
     audioFifo = std::make_unique<AudioFIFO> (static_cast<int>(dawSampleRate * 2.0));
-    
-    // Reset our smoothing envelope when playback starts
     currentGainEnvelope = 1.0f;
+
+    // --- Setup Lookahead Latency ---
+    double lookaheadSeconds = 0.550;
+    
+    lookaheadSamples = static_cast<int>(sampleRate * lookaheadSeconds); 
+    
+    // Tell Ableton to delay all other tracks by 550ms
+    setLatencySamples(lookaheadSamples); 
+
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
+    
+    delayLine.prepare(spec);
+    delayLine.setDelay(static_cast<float>(lookaheadSamples));
+
+    // --- Pre-allocate ML Thread Memory ---
+    int dawSamplesPerHop = static_cast<int>(sampleRate * 0.25);
+    
+    dawHopBuffer.assign(dawSamplesPerHop, 0.0f);
+    resampledHopBuffer.assign(4000, 0.0f);
+    rolling16kBuffer.assign(16000, 0.0f);
+    
+    logMelFeatures.assign(40 * 61, 0.0f);
+    timeDomain.assign(512 * 2, 0.0f); 
+    powerSpec.assign(257, 0.0f);
+    melEnergies.assign(40, 0.0f);
+    
+    startThread(); 
 }
 
 void VocalGateProcessor::releaseResources()
 {
+    // Safely stop the background ML thread
+    stopThread(4000);
+    
     // Free up memory when Ableton stops the transport
     audioFifo.reset();
 }
@@ -70,115 +137,101 @@ void VocalGateProcessor::releaseResources()
 void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-
-    // Clear unused output channels
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
     int numSamples = buffer.getNumSamples();
-    
-    // 1. PUSH TO FIFO
-    // We grab just the left channel (Channel 0) to feed the neural network. 
-    // It's a vocal gate, so mono is standard.
+    auto totalNumInputChannels = getTotalNumInputChannels();
+
+    // 1. PUSH TO ML FIFO (Undelayed Audio)
     const float* leftChannelIn = buffer.getReadPointer(0);
     if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
     {
         audioFifo->push (leftChannelIn, numSamples);
     }
 
-    // 2. READ THE ML PREDICTION
-    // This read is atomic, meaning it will never block the audio thread, 
-    // even if the ML thread is writing to it at the exact same microsecond.
+    // 2. PUSH TO DELAY LINE (The Waiting Room)
+    juce::dsp::AudioBlock<float> block(buffer);
+    juce::dsp::ProcessContextReplacing<float> context(block);
+    delayLine.process(context); 
+    // ^ At this point, 'buffer' now contains the audio from 300ms ago!
+
+    // 3. READ THE ML PREDICTION 
     float currentProb = gateProbability.load();
+    float currentThreshold = thresholdParam->get();
 
-    // Determine target gain (ducking)
-    // If the model is > 50% sure it's a cough/breath, target gain is 0.0 (mute). Otherwise 1.0.
-    float targetGain = (currentProb > 0.5f) ? 0.0f : 1.0f;
+    // Match Python logic: If it's a cough, drop to 0.1f (-20dB), otherwise 1.0f
+    float duckingGain = 0.1f; 
+    float targetGain = (currentProb >= currentThreshold) ? duckingGain : 1.0f;
 
-    // 3. APPLY SMOOTHING (Attack / Release)
-    // We use a simple one-pole lowpass filter to smooth the volume changes.
-    // (In a production plugin, you'd expose these to Ableton as user-tweakable knobs).
-    float attackCoef  = 0.99f;   // Fast close (snaps shut on coughs)
-    float releaseCoef = 0.999f;  // Slower open (fades back in smoothly)
+    // 4. APPLY SMOOTHING TO THE DELAYED AUDIO
+    // To match the ~125ms moving average window from Python at 44.1kHz/48kHz,
+    // we need much slower coefficients. 
+    float envelopeCoef = 0.9998f; 
 
     float* outL = buffer.getWritePointer(0);
     float* outR = (totalNumInputChannels > 1) ? buffer.getWritePointer(1) : nullptr;
 
     for (int i = 0; i < numSamples; ++i)
     {
-        // Smooth the gain trajectory
-        if (targetGain < currentGainEnvelope)
-            currentGainEnvelope = attackCoef * currentGainEnvelope + (1.0f - attackCoef) * targetGain; // Attack
-        else
-            currentGainEnvelope = releaseCoef * currentGainEnvelope + (1.0f - releaseCoef) * targetGain; // Release
+        // Smooth the envelope
+        currentGainEnvelope = envelopeCoef * currentGainEnvelope + (1.0f - envelopeCoef) * targetGain; 
 
-        // Apply the smoothed gain to the actual audio samples
         outL[i] *= currentGainEnvelope;
         if (outR != nullptr)
             outR[i] *= currentGainEnvelope;
     }
+
+    // Inside processBlock, after applying the envelope:
+    float currentPeak = 0.0f;
+    for (int i = 0; i < numSamples; ++i) {
+        currentPeak = std::max(currentPeak, std::abs(outL[i]));
+    }
+    // Smooth it slightly for the UI, or just store the block's peak
+    latestAudioLevel.store(currentPeak);
 }
 
-void VocalGateProcessor::computeMFCCs(const std::vector<float>& audio16k, std::vector<float>& mfccOut)
+void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)
 {
-    int n_fft = 512;
-    int hop_length = 256;
-    int num_frames = 61;     // (16000 - 512) / 256 + 1
-    int num_freq_bins = 257; // n_fft / 2 + 1
-    int num_mels = 40;
-
-    juce::dsp::FFT forwardFFT(9); // 2^9 = 512
-    std::vector<float> timeDomain(n_fft * 2, 0.0f); 
-
-    for (int frame = 0; frame < num_frames; ++frame)
+    size_t n_fft = 512;
+    size_t hop_length = 256;
+    size_t num_frames = 61;     
+    size_t num_freq_bins = 257; 
+    size_t num_mels = 40;
+    
+    for (size_t frame = 0; frame < num_frames; ++frame)
     {
-        int start_sample = frame * hop_length;
+        // Safely exit if the user deletes the plugin!
+        if (threadShouldExit()) return; 
 
-        // 1. Copy audio chunk & apply Hann window
-        std::memset(timeDomain.data(), 0, timeDomain.size() * sizeof(float));
-        for (int i = 0; i < n_fft; ++i) {
+        size_t start_sample = frame * hop_length;
+
+        // Zero out the pre-allocated timeDomain buffer
+        std::fill(timeDomain.begin(), timeDomain.end(), 0.0f);
+
+        for (size_t i = 0; i < n_fft; ++i) {
             timeDomain[i] = audio16k[start_sample + i] * DSPConstants::hannWindow512[i];
         }
 
-        // 2. Perform FFT (JUCE replaces the input array with the output magnitudes)
         forwardFFT.performFrequencyOnlyForwardTransform(timeDomain.data());
         
-        // PyTorch MelSpectrogram uses Power Spectrogram (magnitude squared) by default!
-        std::vector<float> powerSpec(num_freq_bins, 0.0f);
-        for (int i = 0; i < num_freq_bins; ++i) {
+        // Overwrite the pre-allocated powerSpec buffer
+        for (size_t i = 0; i < num_freq_bins; ++i) {
             powerSpec[i] = timeDomain[i] * timeDomain[i];
         }
 
-        // 3. Mel Filterbank Multiplication (PowerSpec @ MelFB)
-        std::vector<float> melEnergies(num_mels, 0.0f);
-        for (int m = 0; m < num_mels; ++m) 
+        // Overwrite the pre-allocated melEnergies buffer
+        for (size_t m = 0; m < num_mels; ++m) 
         {
             float sum = 0.0f;
-            for (int f = 0; f < num_freq_bins; ++f) {
+            for (size_t f = 0; f < num_freq_bins; ++f) {
                 sum += powerSpec[f] * DSPConstants::melFilterBank[f][m];
             }
             
-            // 4. Amplitude to DB (PyTorch default: 10 * log10(max(x, 1e-10)))
             melEnergies[m] = 10.0f * std::log10(std::max(sum, 1e-10f));
-        }
-
-        // 5. Discrete Cosine Transform (MelEnergies @ DCT)
-        for (int mfcc_bin = 0; mfcc_bin < 40; ++mfcc_bin) 
-        {
-            float mfcc_val = 0.0f;
-            for (int m = 0; m < num_mels; ++m) {
-                mfcc_val += melEnergies[m] * DSPConstants::dctMatrix[m][mfcc_bin];
-            }
-            
-            // 6. Store in flat 1D array representing [40, 61]
-            mfccOut[mfcc_bin * num_frames + frame] = mfcc_val;
+            logMelFeatures[m * num_frames + frame] = melEnergies[m];
         }
     }
 }
 
-void VocalGateProcessor::runONNXModel(const std::vector<float>& mfccFeatures)
+void VocalGateProcessor::runONNXModel()
 {
     // 1. Define ONNX Tensor Shapes
     Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -187,13 +240,13 @@ void VocalGateProcessor::runONNXModel(const std::vector<float>& mfccFeatures)
     // Create the input tensor pointing to our MFCC array
     Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
         memoryInfo, 
-        const_cast<float*>(mfccFeatures.data()), 
-        mfccFeatures.size(), 
+        const_cast<float*>(logMelFeatures.data()), 
+        logMelFeatures.size(), 
         inputShape.data(), 
         inputShape.size()
     );
 
-    const char* inputNames[] = {"input_mfcc"};
+    const char* inputNames[] = {"input_log_mel"};
     const char* outputNames[] = {"gate_logit"};
 
     // 2. Run the Model
@@ -218,59 +271,66 @@ void VocalGateProcessor::runONNXModel(const std::vector<float>& mfccFeatures)
 
 // --- The Background ML Thread ---
 void VocalGateProcessor::run()
-// (Note: In a production plugin, you usually export PyTorch's Mel filterbank matrix and DCT matrix as a C++ header file filled with constants so the math matches 1-to-1. Here is the structure of how JUCE handles the DSP steps).
 {
-    // --- 1. Background Thread Setup ---
-    juce::LagrangeInterpolator resampler;
-    std::vector<float> dawHopBuffer;
-    std::vector<float> resampledHopBuffer;
-    
-    // We need 1 second of audio at 16kHz (16,000 samples)
-    std::vector<float> rolling16kBuffer (16000, 0.0f); 
-
-    // Calculate how many DAW samples equal our 250ms (4000 sample) target hop at 16kHz
     int dawSamplesPerHop = static_cast<int>(dawSampleRate * 0.25);
-    dawHopBuffer.resize(dawSamplesPerHop, 0.0f);
-    resampledHopBuffer.resize(4000, 0.0f);
 
     while (! threadShouldExit())
     {
-        // 2. Wait until we have enough new audio from Ableton
         if (audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop)
         {
-            // Pop the new audio block
+            // Pop directly into our pre-allocated buffer
             audioFifo->pop(dawHopBuffer.data(), dawSamplesPerHop);
 
-            // 3. Resample down to 16kHz
             const float* inData = dawHopBuffer.data();
             float* outData = resampledHopBuffer.data();
             resampler.process(dawSampleRate / 16000.0, inData, outData, 4000);
 
-            // 4. Shift our 1-second rolling buffer back by 250ms, and append the new audio
-            // This is standard FIFO array shifting
             std::memmove(rolling16kBuffer.data(), 
                          rolling16kBuffer.data() + 4000, 
                          12000 * sizeof(float));
+                         
             std::memcpy(rolling16kBuffer.data() + 12000, 
                         resampledHopBuffer.data(), 
                         4000 * sizeof(float));
 
-            // 5. Extract MFCCs (The heavy lifting)
-            // Target output shape: [1, 1, 40, 61] (Batch, Channel, Mels, Frames)
-            std::vector<float> mfccFeatures(40 * 61, 0.0f);
-            computeMFCCs(rolling16kBuffer, mfccFeatures);
+            // computeLogMels now writes directly to our class member 'logMelFeatures'
+            computeLogMels(rolling16kBuffer);
 
-            // 6. Run ONNX Inference
             if (onnxSession != nullptr)
             {
-                runONNXModel(mfccFeatures);
+                if (threadShouldExit()) return; // Another safety check before inference
+
+                try {
+                    auto startTime = juce::Time::getMillisecondCounterHiRes(); 
+                    
+                    // runONNXModel can just use the 'logMelFeatures' class member
+                    runONNXModel();
+                    
+                    auto endTime = juce::Time::getMillisecondCounterHiRes();  
+                    juce::Logger::writeToLog("VocalGate ONNX Inference Took: " + juce::String(endTime - startTime) + " ms");
+                } 
+                catch (const Ort::Exception& e) {
+                    juce::Logger::writeToLog("ONNX RUN ERROR: " + juce::String(e.what()));
+                    wait(1000); 
+                }
             }
         }
         else
         {
-            // Sleep for 10ms so we don't fry the user's CPU while waiting for audio
             wait(10);
         }
     }
+}
+
+juce::AudioProcessorEditor* VocalGateProcessor::createEditor()
+{
+    // Assuming your custom editor class is named VocalGateEditor
+    return new VocalGateEditor (*this); 
+}
+
+// This creates new instances of the plugin..
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    return new VocalGateProcessor();
 }
 

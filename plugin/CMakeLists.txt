@@ -1,4 +1,3 @@
-CMake
 # plugin/CMakeLists.txt
 cmake_minimum_required(VERSION 3.15)
 project(VocalGate VERSION 1.0.0)
@@ -21,7 +20,8 @@ juce_add_plugin(VocalGate
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     # We turn this OFF because we handle the copy manually in the POST_BUILD step
-    COPY_PLUGIN_AFTER_BUILD FALSE            
+    COPY_PLUGIN_AFTER_BUILD FALSE  
+    VST3_AUTO_MANIFEST FALSE          
     PLUGIN_MANUFACTURER_CODE "DanK"
     PLUGIN_CODE "Vgt1"                      
     FORMATS AU VST3 Standalone
@@ -37,6 +37,7 @@ target_sources(VocalGate
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
         Source/AudioFIFO.h
+        Source/DSPConstants.h
 )
 
 # 4. Standard JUCE Definitions
@@ -60,7 +61,7 @@ target_link_libraries(VocalGate
 )
 
 # 6. Include ONNX Directories
-target_include_directories(VocalGate PRIVATE 
+target_include_directories(VocalGate SYSTEM PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/include
 )
 
