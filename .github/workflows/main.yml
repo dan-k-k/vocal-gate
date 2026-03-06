@@ -34,7 +34,7 @@ jobs:
   # Job 2: C++ FIFO & Buffer Tests
   test-cpp:
     name: C++ Unit Tests
-    rruns-on: macos-14
+    runs-on: macos-14
     
     steps:
     - name: Checkout Code with Submodules
