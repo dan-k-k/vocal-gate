@@ -101,13 +101,16 @@ add_custom_command(TARGET VocalGate_VST3 POST_BUILD
 )
 
 # ---------------------------------------------------------------------------
-# 9. Testing (Optional)
+# 9. Testing
 # ---------------------------------------------------------------------------
-# I included this from your StemExtractor logic, but commented it out 
-# so CMake doesn't throw an error looking for files you haven't made yet.
-#
-# enable_testing()
-# add_executable(RunCPPTests ../tests/CPP/test_fifo.cpp)
-# target_link_libraries(RunCPPTests PRIVATE juce::juce_audio_utils juce::juce_dsp)
-# add_test(NAME FIFOTest COMMAND RunCPPTests)
+enable_testing()
+
+# We uncommented this and updated the file name to test_main.cpp!
+add_executable(RunCPPTests ../tests/CPP/test_main.cpp)
+
+# Link the JUCE modules your tests need
+target_link_libraries(RunCPPTests PRIVATE juce::juce_audio_utils juce::juce_dsp)
+
+# Register the test with CTest
+add_test(NAME FIFOTest COMMAND RunCPPTests)
 
