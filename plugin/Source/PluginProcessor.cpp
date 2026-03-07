@@ -20,8 +20,27 @@ VocalGateProcessor::VocalGateProcessor()
 #endif
 {
     // Register the parameter with the DAW (ID, Name, Min, Max, Default)
-    thresholdParam = new juce::AudioParameterFloat("threshold", "Threshold", 0.01f, 0.99f, 0.50f);
+    juce::NormalisableRange<float> floorRange (-100.0f, 0.0f, 0.1f);
+    floorRange.setSkewForCentre (-18.0f);
+    auto floorAttributes = juce::AudioParameterFloatAttributes()
+        .withStringFromValueFunction([] (float value, int maximumStringLength) 
+        {
+            if (value <= -99.9f) 
+                return juce::String ("-inf");
+            
+            return juce::String (value, 1); // 1 decimal place for normal values
+        });
+
+    thresholdParam = new juce::AudioParameterFloat("threshold", "Threshold", 0.001f, 0.999f, 0.50f);
+    floorParam = new juce::AudioParameterFloat("floor", "Floor", floorRange, -20.0f, floorAttributes);
+    attackParam  = new juce::AudioParameterFloat("attack", "Attack (ms)", 1.0f, 500.0f, 10.0f);
+    releaseParam = new juce::AudioParameterFloat("release", "Release (ms)", 10.0f, 2000.0f, 150.0f);
+    shiftParam   = new juce::AudioParameterFloat("shift", "Shift (ms)", -100.0f, 200.0f, 0.0f);
     addParameter(thresholdParam);
+    addParameter(floorParam);
+    addParameter(attackParam);
+    addParameter(releaseParam);
+    addParameter(shiftParam);
 
     Ort::SessionOptions sessionOptions;
     sessionOptions.SetIntraOpNumThreads(1);
@@ -108,7 +127,27 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     spec.numChannels = getTotalNumOutputChannels();
     
     delayLine.prepare(spec);
-    delayLine.setDelay(static_cast<float>(lookaheadSamples));
+    smoothedDelay.reset(sampleRate, 0.05); 
+    
+    // Calculate the initial delay time so it starts perfectly in place
+    float initialShift = shiftParam->get();
+    float initialDelay = lookaheadSamples - (initialShift * (sampleRate / 1000.0f));
+    smoothedDelay.setCurrentAndTargetValue(initialDelay);
+
+    delayLine.setDelay(initialDelay);
+
+    // Set the glide time to 20ms
+    double rampTimeSeconds = 0.02; 
+    smoothedThreshold.reset(sampleRate, rampTimeSeconds);
+    smoothedFloorDB.reset(sampleRate, rampTimeSeconds);
+    smoothedAttack.reset(sampleRate, rampTimeSeconds);
+    smoothedRelease.reset(sampleRate, rampTimeSeconds);
+
+    // Snap them immediately to the current knob positions so they don't fade in from zero
+    smoothedThreshold.setCurrentAndTargetValue(thresholdParam->get());
+    smoothedFloorDB.setCurrentAndTargetValue(floorParam->get());
+    smoothedAttack.setCurrentAndTargetValue(attackParam->get());
+    smoothedRelease.setCurrentAndTargetValue(releaseParam->get());
 
     // --- Pre-allocate ML Thread Memory ---
     int dawSamplesPerHop = static_cast<int>(sampleRate * 0.25);
@@ -138,54 +177,96 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
     int numSamples = buffer.getNumSamples();
-    auto totalNumInputChannels = getTotalNumInputChannels();
 
-    // 1. PUSH TO ML FIFO (Undelayed Audio)
+    // --- 1. PUSH TO ML FIFO (Undelayed Audio) ---
+    // We MUST send the real-time audio to the neural network before we delay it!
     const float* leftChannelIn = buffer.getReadPointer(0);
     if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
     {
         audioFifo->push (leftChannelIn, numSamples);
     }
 
-    // 2. PUSH TO DELAY LINE (The Waiting Room)
-    juce::dsp::AudioBlock<float> block(buffer);
-    juce::dsp::ProcessContextReplacing<float> context(block);
-    delayLine.process(context); 
-    // ^ At this point, 'buffer' now contains the audio from 300ms ago!
+    // --- 2. PUSH TO DELAY LINE (Smoothed to prevent clicks!) ---
+    float shiftMs = shiftParam->get();
+    float targetDelaySamples = lookaheadSamples - (shiftMs * (dawSampleRate / 1000.0f));
+    targetDelaySamples = juce::jlimit(0.0f, (float)delayLine.getMaximumDelayInSamples() - 1.0f, targetDelaySamples);
+    
+    // Tell the smoother where we want to go
+    smoothedDelay.setTargetValue(targetDelaySamples);
 
-    // 3. READ THE ML PREDICTION 
-    float currentProb = gateProbability.load();
-    float currentThreshold = thresholdParam->get();
-
-    // Match Python logic: If it's a cough, drop to 0.1f (-20dB), otherwise 1.0f
-    float duckingGain = 0.1f; 
-    float targetGain = (currentProb >= currentThreshold) ? duckingGain : 1.0f;
-
-    // 4. APPLY SMOOTHING TO THE DELAYED AUDIO
-    // To match the ~125ms moving average window from Python at 44.1kHz/48kHz,
-    // we need much slower coefficients. 
-    float envelopeCoef = 0.9998f; 
-
-    float* outL = buffer.getWritePointer(0);
-    float* outR = (totalNumInputChannels > 1) ? buffer.getWritePointer(1) : nullptr;
-
+    smoothedThreshold.setTargetValue(thresholdParam->get());
+    smoothedFloorDB.setTargetValue(floorParam->get());
+    smoothedAttack.setTargetValue(attackParam->get());
+    smoothedRelease.setTargetValue(releaseParam->get());
+    
+    int numChannels = getTotalNumInputChannels();
+    
+    // Process the delay line sample-by-sample to allow the smooth glide
     for (int i = 0; i < numSamples; ++i)
     {
-        // Smooth the envelope
-        currentGainEnvelope = envelopeCoef * currentGainEnvelope + (1.0f - envelopeCoef) * targetGain; 
+        // Get the interpolated delay time for this exact sample
+        delayLine.setDelay(smoothedDelay.getNextValue());
+
+        for (int ch = 0; ch < numChannels; ++ch)
+        {
+            float in = buffer.getSample(ch, i);
+            float out = delayLine.popSample(ch); // Read delayed audio
+            delayLine.pushSample(ch, in);        // Write new audio
+            buffer.setSample(ch, i, out);        // Overwrite buffer with delayed audio
+        }
+    }
+
+    // --- 3. MEASURE DELAYED INPUT PEAK ---
+    float currentInPeak = 0.0f;
+    const float* delayedInL = buffer.getReadPointer(0);
+    for (int i = 0; i < numSamples; ++i) {
+        currentInPeak = std::max(currentInPeak, std::abs(delayedInL[i]));
+    }
+    inputLevel.store(currentInPeak);
+
+    // Read the ML brain once per block (safe to do outside the loop)
+    float currentProb = gateProbability.load(); 
+
+    float* outL = buffer.getWritePointer(0);
+    float* outR = (getTotalNumInputChannels() > 1) ? buffer.getWritePointer(1) : nullptr;
+    float currentOutPeak = 0.0f;
+
+    // --- 4. APPLY GATE ENVELOPES (Sample-by-Sample) ---
+    for (int i = 0; i < numSamples; ++i)
+    {
+        // Get the exact, smoothed knob values for THIS specific sample
+        float currentThreshold = smoothedThreshold.getNextValue();
+        float currentFloorDB = smoothedFloorDB.getNextValue();
+        float currentAttackMs = smoothedAttack.getNextValue();
+        float currentReleaseMs = smoothedRelease.getNextValue();
+
+        // Calculate target gain based on the smoothed floor and threshold
+        float duckingGain = (currentFloorDB <= -99.9f) ? 0.0f : juce::Decibels::decibelsToGain(currentFloorDB);
+        float targetGain = (currentProb >= currentThreshold) ? duckingGain : 1.0f;
+
+        // Calculate coefficients dynamically
+        float attackCoef = std::exp(-1.0f / (currentAttackMs * 0.001f * dawSampleRate));
+        float releaseCoef = std::exp(-1.0f / (currentReleaseMs * 0.001f * dawSampleRate));
+
+        // FIX 2: Swap the Attack/Release conditions for a Ducker!
+        // If target is LOWER than current (ducking a cough), use Attack to clamp down quickly.
+        if (targetGain < currentGainEnvelope) {
+            currentGainEnvelope = attackCoef * currentGainEnvelope + (1.0f - attackCoef) * targetGain;
+        } 
+        // If target is HIGHER (cough is over, vocals returning), use Release to fade back smoothly.
+        else {
+            currentGainEnvelope = releaseCoef * currentGainEnvelope + (1.0f - releaseCoef) * targetGain;
+        }
 
         outL[i] *= currentGainEnvelope;
+        currentOutPeak = std::max(currentOutPeak, std::abs(outL[i]));
+
         if (outR != nullptr)
             outR[i] *= currentGainEnvelope;
     }
 
-    // Inside processBlock, after applying the envelope:
-    float currentPeak = 0.0f;
-    for (int i = 0; i < numSamples; ++i) {
-        currentPeak = std::max(currentPeak, std::abs(outL[i]));
-    }
-    // Smooth it slightly for the UI, or just store the block's peak
-    latestAudioLevel.store(currentPeak);
+    // --- 6. STORE OUTPUT PEAK ---
+    outputLevel.store(currentOutPeak);
 }
 
 void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)

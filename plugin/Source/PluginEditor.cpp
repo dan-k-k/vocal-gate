@@ -5,119 +5,184 @@
 VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    setSize (500, 300); // Made it wider for the scrolling timeline
+    setSize (600, 300); 
 
-    // --- Setup Threshold Slider ---
-    thresholdSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(thresholdSlider);
+    // Updated lambda to accept a color for the pointer
+    auto setupKnob = [this](juce::Slider& slider, juce::Label& label, const juce::String& text, 
+                            const juce::String& suffix, auto* param, 
+                            std::unique_ptr<juce::SliderParameterAttachment>& attachment,
+                            juce::Colour pointerColor) 
+    {
+        slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 120, 20);
+        slider.setTextValueSuffix(suffix);
+        
+        // Apply our custom LookAndFeel and color
+        slider.setLookAndFeel(&customKnobLookAndFeel);
+        slider.setColour(juce::Slider::thumbColourId, pointerColor);
+        slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack); // Clean up the text box
 
-    // ADD THIS: Link the slider to the processor's parameter.
-    // This single line replaces setRange, setValue, and the old onValueChange lambda!
-    thresholdAttachment = std::make_unique<juce::SliderParameterAttachment>(*audioProcessor.thresholdParam, thresholdSlider, nullptr);
+        addAndMakeVisible(slider);
+        attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider, nullptr);
 
-    thresholdLabel.setText("Threshold", juce::dontSendNotification);
-    thresholdLabel.attachToComponent(&thresholdSlider, true);
-    thresholdLabel.setColour(juce::Label::textColourId, juce::Colours::white);
-    addAndMakeVisible(thresholdLabel);
+        label.setText(text, juce::dontSendNotification);
+        label.attachToComponent(&slider, false);
+        label.setJustificationType(juce::Justification::centred);
+        label.setColour(juce::Label::textColourId, juce::Colours::white);
+        addAndMakeVisible(label);
+    };
 
-    // Wake up 60 times a second to redraw the screen
+    // --- Define your theme colors ---
+    juce::Colour detectionColor = juce::Colours::darkorange;
+    juce::Colour envelopeColor = juce::Colour::fromRGB(40, 210, 180); // Cyan matching the audio output
+
+    // --- Apply them to the knobs ---
+    setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", audioProcessor.thresholdParam, thresholdAttachment, detectionColor);
+    setupKnob(floorSlider, floorLabel, "Floor", " dB", audioProcessor.floorParam, floorAttachment, detectionColor);
+    
+    setupKnob(attackSlider, attackLabel, "Attack", " ms", audioProcessor.attackParam, attackAttachment, envelopeColor);
+    setupKnob(releaseSlider, releaseLabel, "Release", " ms", audioProcessor.releaseParam, releaseAttachment, envelopeColor);
+    setupKnob(shiftSlider, shiftLabel, "Shift", " ms", audioProcessor.shiftParam, shiftAttachment, envelopeColor);
+
     startTimerHz(60); 
 }
 
-VocalGateEditor::~VocalGateEditor() {}
+VocalGateEditor::~VocalGateEditor() 
+{
+    // CRITICAL: You must remove the custom LookAndFeel before the editor is destroyed
+    thresholdSlider.setLookAndFeel(nullptr);
+    floorSlider.setLookAndFeel(nullptr);
+    attackSlider.setLookAndFeel(nullptr);
+    releaseSlider.setLookAndFeel(nullptr);
+    shiftSlider.setLookAndFeel(nullptr);
+}
 
 void VocalGateEditor::timerCallback()
 {
-    // 1. Read the latest values from the background ML & Audio threads
-    float currentProb = audioProcessor.gateProbability.load();
-    float currentAudio = audioProcessor.latestAudioLevel.load();
+    // Read all three values
+    inputHistory[writeIndex]  = audioProcessor.inputLevel.load();
+    outputHistory[writeIndex] = audioProcessor.outputLevel.load();
+    probHistory[writeIndex]   = audioProcessor.gateProbability.load(); // Read the ML brain
 
-    // 2. Save them into our circular arrays
-    probHistory[writeIndex] = currentProb;
-    audioHistory[writeIndex] = currentAudio;
-
-    // 3. Advance the index, wrapping around if we hit the end
     writeIndex = (writeIndex + 1) % historySize;
-
-    // 4. Tell JUCE to call paint() again
     repaint(); 
 }
 
 void VocalGateEditor::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds();
-    
-    // Dark grey background
-    g.fillAll (juce::Colour::fromRGB (30, 30, 30));
+    g.fillAll (juce::Colour::fromRGB (20, 20, 22));
 
-    // Define the graphing area
-    auto graphArea = bounds.withTrimmedBottom(60).withTrimmedTop(20).withTrimmedRight(20).withTrimmedLeft(20);
-    g.setColour(juce::Colour::fromRGB(45, 45, 45));
-    g.fillRect(graphArea);
+    // --- NEW LAYOUT MATH ---
+    auto graphArea = bounds.withTrimmedBottom(110).withTrimmedTop(15).withTrimmedRight(20).withTrimmedLeft(20);
+    auto audioArea = graphArea.removeFromTop(graphArea.getHeight() / 2);
+    auto probArea = graphArea; 
 
-    // --- Draw the Scrolling Paths ---
-    juce::Path probPath;
-    juce::Path audioPath;
+    // Draw subtle backgrounds
+    g.setColour(juce::Colour::fromRGB(30, 30, 34));
+    g.fillRect(audioArea);
+    g.setColour(juce::Colour::fromRGB(25, 25, 28)); 
+    g.fillRect(probArea);
 
-    float width = graphArea.getWidth();
-    float height = graphArea.getHeight();
-    float bottom = graphArea.getBottom();
+    juce::Path inputPath, outputPath, probPath;
+
+    float width = audioArea.getWidth();
     float xStep = width / (historySize - 1);
+
+    inputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
+    outputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
+
+    // --- INSTANT VISUAL SHIFT MATH ---
+    // 60 frames per 1000ms means 0.06 frames per ms
+    float shiftMs = static_cast<float>(shiftSlider.getValue());
+    int offsetFrames = juce::roundToInt(shiftMs * 0.06f); 
 
     for (int i = 0; i < historySize; ++i)
     {
-        // Read from oldest to newest using the circular index
-        int readIndex = (writeIndex + i) % historySize;
+        // 1. Audio Read Index (Normal circular buffer read)
+        int audioReadIndex = (writeIndex + i) % historySize;
         
-        float x = graphArea.getX() + (i * xStep);
-        
-        // Map probability (0.0 to 1.0) to Y pixels
-        float probY = bottom - (probHistory[readIndex] * height);
-        
-        // Map audio (0.0 to 1.0) to Y pixels (drawn from the center line)
-        float audioYOffset = audioHistory[readIndex] * (height * 0.4f);
+        // 2. Prob Read Index (Clamped to prevent the wrap-around glitch!)
+        // Instead of letting it loop, we clamp 'i + offsetFrames' to stay within our history limits
+        int logicalProbIndex = juce::jlimit(0, historySize - 1, i + offsetFrames);
+        int probReadIndex = (writeIndex + logicalProbIndex) % historySize;
 
-        if (i == 0) {
-            probPath.startNewSubPath(x, probY);
-            audioPath.startNewSubPath(x, graphArea.getCentreY() - audioYOffset);
-        } else {
-            probPath.lineTo(x, probY);
-            audioPath.lineTo(x, graphArea.getCentreY() - audioYOffset);
-        }
+        float x = audioArea.getX() + (i * xStep);
+        
+        // Map audio to the top area
+        float inY = audioArea.getBottom() - (inputHistory[audioReadIndex] * audioArea.getHeight());
+        float outY = audioArea.getBottom() - (outputHistory[audioReadIndex] * audioArea.getHeight());
+
+        // Map probability to the bottom area using the CLAMPED shifted index
+        float pY = probArea.getBottom() - (probHistory[probReadIndex] * probArea.getHeight());
+
+        inputPath.lineTo(x, inY);
+        outputPath.lineTo(x, outY);
+
+        if (i == 0) probPath.startNewSubPath(x, pY);
+        else        probPath.lineTo(x, pY);
     }
 
-    // Draw Audio Waveform (Dodger Blue)
-    g.setColour (juce::Colours::dodgerblue.withAlpha(0.6f));
-    g.strokePath (audioPath, juce::PathStrokeType(2.0f));
+    // Close the audio paths
+    inputPath.lineTo(audioArea.getRight(), audioArea.getBottom());
+    inputPath.closeSubPath();
+    outputPath.lineTo(audioArea.getRight(), audioArea.getBottom());
+    outputPath.closeSubPath();
 
-    // Draw ML Probability (Dark Orange)
+    // --- 1. Draw Audio Silhouettes ---
+    g.setColour(juce::Colour::fromRGB(80, 85, 95).withAlpha(0.4f));
+    g.fillPath(inputPath);
+
+    g.setColour(juce::Colour::fromRGB(40, 210, 180).withAlpha(0.85f));
+    g.fillPath(outputPath);
+
+    // --- 2. Draw Probability Curve ---
     g.setColour (juce::Colours::darkorange);
-    g.strokePath (probPath, juce::PathStrokeType(3.0f));
+    g.strokePath (probPath, juce::PathStrokeType(2.0f));
 
-    // --- Draw Threshold Line (Red Dashed) ---
+    // --- 3. Draw Threshold Line ---
     float threshVal = static_cast<float>(thresholdSlider.getValue());
-    float threshY = bottom - (threshVal * height);
-    g.setColour(juce::Colours::red.withAlpha(0.8f));
-    g.drawLine(graphArea.getX(), threshY, graphArea.getRight(), threshY, 2.0f);
+    float threshY = probArea.getBottom() - (threshVal * probArea.getHeight());
+    
+    g.setColour(juce::Colours::white.withAlpha(0.6f));
+    float dashLengths[2] = { 4.0f, 4.0f };
+    g.drawDashedLine(juce::Line<float>(probArea.getX(), threshY, probArea.getRight(), threshY), dashLengths, 2, 1.0f);
 
-    // --- Draw The 550ms Lookahead Playhead! ---
-    // 550ms is ~27.5% of our 2.0 second window. 
-    // We draw the line 27.5% from the RIGHT edge.
-    float lookaheadOffsetRatio = 0.550f / 2.0f; 
-    float playheadX = graphArea.getRight() - (width * lookaheadOffsetRatio);
-    
-    g.setColour(juce::Colours::white);
-    g.drawLine(playheadX, graphArea.getY(), playheadX, graphArea.getBottom(), 2.0f);
-    
-    g.setFont(14.0f);
+    // --- 4. ML BRAIN ERROR OVERLAY (Add this at the very end of paint!) ---
+    if (! audioProcessor.isModelLoaded())
+    {
+        // Dim the entire graph area slightly to make the text pop
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.fillRect (graphArea);
+
+        // Draw the main warning text
+        g.setColour (juce::Colours::red.brighter());
+        g.setFont (juce::Font (22.0f, juce::Font::bold));
+        g.drawFittedText ("MODEL MISSING: ML BRAIN OFFLINE", graphArea, juce::Justification::centred, 1);
+        
+        // Draw a helpful sub-text slightly below the center
+        g.setFont (juce::Font (14.0f));
+        g.setColour (juce::Colours::lightgrey);
+        g.drawFittedText ("Could not find vocalgate_int8.onnx on this system.", 
+                          graphArea.translated(0, 25), juce::Justification::centred, 1);
+    }
 }
 
 void VocalGateEditor::resized()
 {
     auto bounds = getLocalBounds();
-    auto bottomArea = bounds.removeFromBottom(50);
+    auto bottomArea = bounds.removeFromBottom(110); // Area for knobs
     
-    thresholdSlider.setBounds(bottomArea.withTrimmedLeft(100).withTrimmedRight(20).withTrimmedBottom(10));
+    int squeezePixels = 40; 
+    bottomArea = bottomArea.withTrimmedLeft(squeezePixels).withTrimmedRight(squeezePixels);
+    
+    int knobWidth = bottomArea.getWidth() / 5; // 5 narrower columns
+    int shiftDown = 8;
+
+    thresholdSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    floorSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    attackSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    releaseSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    shiftSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
 }
 

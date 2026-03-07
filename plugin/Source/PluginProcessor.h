@@ -1,6 +1,7 @@
 // plugin/Source/PluginProcessor.h
 #pragma once
-#include <JuceHeader.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 #include <onnxruntime_cxx_api.h>
 #include "AudioFIFO.h"
 #include <juce_dsp/juce_dsp.h> // Ensure this is included at the top
@@ -26,6 +27,7 @@ public:
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
+    bool isModelLoaded() const { return onnxSession != nullptr; }
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -38,9 +40,14 @@ public:
 
     // The Editor writes to this, the Processor reads from it
     juce::AudioParameterFloat* thresholdParam;
-    
+    juce::AudioParameterFloat* floorParam;
+    juce::AudioParameterFloat* attackParam;
+    juce::AudioParameterFloat* releaseParam;
+    juce::AudioParameterFloat* shiftParam;
+
     // The Processor updates this, the Editor reads it for the visualizer
-    std::atomic<float> latestAudioLevel { 0.0f };
+    std::atomic<float> inputLevel { 0.0f };
+    std::atomic<float> outputLevel { 0.0f };
 
         // We use atomic so the background thread can update it and the audio thread 
     // can read it simultaneously without data races.
@@ -71,8 +78,13 @@ private:
     std::unique_ptr<Ort::Session> onnxSession;
 
     // --- Delay / Lookahead ---
-    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> delayLine { 48000 * 2 }; // Max 2 seconds of delay
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 96000 };
     int lookaheadSamples = 0;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDelay;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedThreshold;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFloorDB;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedAttack;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRelease;
 
     // --- Pre-allocated Memory (Avoids Heap Thrashing) ---
     std::vector<float> dawHopBuffer;

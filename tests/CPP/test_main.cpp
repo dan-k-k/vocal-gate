@@ -2,6 +2,9 @@
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 
+// --- ADD THIS: Include your processor header ---
+#include "../../plugin/Source/PluginProcessor.h" 
+
 // ---------------------------------------------------------
 // 1. Define your FIFO Test
 // ---------------------------------------------------------
@@ -50,13 +53,34 @@ public:
 };
 
 // ---------------------------------------------------------
-// 3. Instantiate them statically so JUCE finds them
+// 3. Define the Missing Model Test (NEW)
+// ---------------------------------------------------------
+class ModelLoadingTest : public juce::UnitTest {
+public:
+    ModelLoadingTest() : juce::UnitTest ("ONNX Model State Test") {}
+    
+    void runTest() override {
+        beginTest ("Processor gracefully handles missing ONNX file");
+        
+        // Instantiate the processor. It will attempt to load the ONNX file
+        // from the system directory in its constructor.
+        VocalGateProcessor processor;
+
+        // Since the CI/test environment does not have the .onnx file installed 
+        // at the hardcoded path, this should not crash, and the boolean should be false.
+        expect (! processor.isModelLoaded());
+    }
+};
+
+// ---------------------------------------------------------
+// 4. Instantiate them statically so JUCE finds them
 // ---------------------------------------------------------
 static FifoTest fifoTest; 
 static AudioFifoTest audioFifoTest; 
+static ModelLoadingTest modelLoadingTest; // <-- Added this
 
 // ---------------------------------------------------------
-// 4. ONE Main function to rule them all
+// 5. ONE Main function to rule them all
 // ---------------------------------------------------------
 int main (int argc, char* argv[]) {
     juce::UnitTestRunner runner;
