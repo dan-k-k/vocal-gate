@@ -112,26 +112,24 @@ add_custom_command(TARGET VocalGate_VST3 POST_BUILD
 # ---------------------------------------------------------------------------
 enable_testing()
 
-# 1. Add your test main AND your plugin source files so the test can build the processor
+# 1. Add ONLY your test main and isolated headers/files (like AudioFIFO)
 add_executable(RunCPPTests 
     ../tests/CPP/test_main.cpp
-    Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp
+    # Notice we removed PluginProcessor and PluginEditor!
 )
 
-# 2. Link the JUCE modules AND the ONNX Runtime library
+# 2. Link ONLY the JUCE modules needed for the tests
 target_link_libraries(RunCPPTests 
     PRIVATE 
-        VocalGateData # <--- ADD THIS HERE!
-        juce::juce_audio_utils 
-        juce::juce_dsp
-        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib
+        juce::juce_audio_basics 
+        juce::juce_core
+        # Notice we removed VocalGateData, juce_dsp, and libonnxruntime!
 )
 
-# 3. Add the ONNX include directories so the test target can find the headers
+# 3. Add the Source directory so your test_main.cpp can #include "AudioFIFO.h"
 target_include_directories(RunCPPTests 
-    SYSTEM PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/include
+    PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
 )
 
 # 4. Register the test with CTest

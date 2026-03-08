@@ -44,7 +44,8 @@ jobs:
 
     - name: Bypass CMake ONNX Requirement
       run: |
-        # Changed the dummy file name to match your Vocal Gate ONNX file
+        # We still need this dummy file so CMake's configure step doesn't crash 
+        # when reading juce_add_binary_data.
         mkdir -p plugin 
         touch plugin/vocalgate_int8.onnx
 
@@ -52,11 +53,10 @@ jobs:
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
 
     - name: Compile Tests Only
+      # This tells CMake to ONLY build the RunCPPTests executable, ignoring the main plugin
       run: cmake --build build --target RunCPPTests --parallel 4 
 
     - name: Run CTest
-      # ADD THIS ENV BLOCK: Explicitly point to the ONNX lib directory
-      env:
-        DYLD_LIBRARY_PATH: ${{ github.workspace }}/plugin/onnxruntime/lib
+      # NO MORE DYLD_LIBRARY_PATH! The tests are entirely self-sufficient now.
       run: ctest --test-dir build --output-on-failure
 
