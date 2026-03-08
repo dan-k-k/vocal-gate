@@ -4,6 +4,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <onnxruntime_cxx_api.h>
 #include "AudioFIFO.h"
+#include <mutex> // Add this at the top of your header
 
 class VocalGateProcessor : public juce::AudioProcessor, public juce::Thread
 {
@@ -116,6 +117,11 @@ private:
     // --- Thread Synchronization ---
     juce::WaitableEvent mlTriggerEvent;
     int dawSamplesPerHop = 0;
+
+    // --- Offline Buffer ---
+    void processMLHop(const float* hopData);
+    std::mutex mlMutex; 
+    std::vector<float> offlineHopBuffer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VocalGateProcessor)
 };

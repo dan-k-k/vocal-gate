@@ -200,6 +200,7 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     dawSamplesPerHop = static_cast<int>(sampleRate * 0.05);
     
     dawHopBuffer.assign(dawSamplesPerHop, 0.0f);
+    offlineHopBuffer.assign(dawSamplesPerHop, 0.0f); // <--- ADD THIS
     resampledHopBuffer.assign(800, 0.0f);
     rolling16kBuffer.assign(16000, 0.0f);
 
@@ -230,16 +231,33 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
     int numSamples = buffer.getNumSamples();
-
-    // --- 1. PUSH TO ML FIFO (Undelayed Audio) ---
     const float* leftChannelIn = buffer.getReadPointer(0);
-    if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
+
+    // --- 1. HANDLE AUDIO FIFO & ML ROUTING ---
+    if (isNonRealtime()) 
     {
-        audioFifo->push (leftChannelIn, numSamples);
-        
-        // WAKE UP THE ML THREAD IF WE HAVE ENOUGH DATA!
-        if (audioFifo->getNumReady() >= dawSamplesPerHop)
-            mlTriggerEvent.signal();
+        // OFFLINE RENDER: Force the audio thread to wait for the ML model synchronously
+        if (audioFifo != nullptr) 
+        {
+            audioFifo->push(leftChannelIn, numSamples);
+            
+            // Loop through all available complete hops and process immediately
+            while (audioFifo->getNumReady() >= dawSamplesPerHop) 
+            {
+                audioFifo->pop(offlineHopBuffer.data(), dawSamplesPerHop);
+                processMLHop(offlineHopBuffer.data()); // Blocks audio thread until ML finishes
+            }
+        }
+    }
+    else 
+    {
+        // REALTIME PLAYBACK: Delegate to background thread to prevent audio glitches
+        if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
+        {
+            audioFifo->push (leftChannelIn, numSamples);
+            if (audioFifo->getNumReady() >= dawSamplesPerHop)
+                mlTriggerEvent.signal(); // Wake up the thread
+        }
     }
 
     // --- 2. PUSH TO DELAY LINE (Smoothed to prevent clicks!) ---
@@ -373,6 +391,43 @@ void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)
     }
 }
 
+void VocalGateProcessor::processMLHop(const float* hopData)
+{
+    // Lock to ensure thread safety over shared vectors (rolling16kBuffer, etc.)
+    std::lock_guard<std::mutex> lock(mlMutex); 
+
+    const float silenceThreshold = juce::Decibels::decibelsToGain(-50.0f);
+    
+    float peakLevel = 0.0f;
+    for (int i = 0; i < dawSamplesPerHop; ++i) {
+        peakLevel = std::max(peakLevel, std::abs(hopData[i]));
+    }
+
+    if (peakLevel < silenceThreshold) 
+    {
+        pushAndAveragePrediction(0.0f);
+    }
+    else 
+    {
+        resampler.process(dawSampleRate / 16000.0, hopData, resampledHopBuffer.data(), 800);
+
+        std::memmove(rolling16kBuffer.data(), rolling16kBuffer.data() + 800, 15200 * sizeof(float));
+        std::memcpy(rolling16kBuffer.data() + 15200, resampledHopBuffer.data(), 800 * sizeof(float));
+
+        computeLogMels(rolling16kBuffer);
+
+        if (onnxSession != nullptr)
+        {
+            try {
+                runONNXModel(); 
+            } 
+            catch (const Ort::Exception& e) {
+                juce::Logger::writeToLog("ONNX RUN ERROR: " + juce::String(e.what()));
+            }
+        }
+    }
+}
+
 void VocalGateProcessor::runONNXModel()
 {
     // 1. Create the input tensor wrapper
@@ -418,63 +473,17 @@ void VocalGateProcessor::runONNXModel()
 // --- The Background ML Thread ---
 void VocalGateProcessor::run()
 {    
-    // Calculate our "silence" threshold (-50 dB converted to linear gain)
-    // -50 dB is roughly 0.00316
-    const float silenceThreshold = juce::Decibels::decibelsToGain(-50.0f);
-
     while (! threadShouldExit())
     {
-        // Loop to process all available hops in case we fell behind
-        if (audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop)
+        // Only process on the background thread if we are in REALTIME
+        if (!isNonRealtime() && audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop)
         {
             audioFifo->pop(dawHopBuffer.data(), dawSamplesPerHop);
-
-            // --- 1. QUICK SILENCE CHECK ---
-            float peakLevel = 0.0f;
-            for (int i = 0; i < dawSamplesPerHop; ++i) {
-                peakLevel = std::max(peakLevel, std::abs(dawHopBuffer[i]));
-            }
-
-            // --- 2. BRANCH BASED ON AUDIO LEVEL ---
-            if (peakLevel < silenceThreshold) 
-            {
-                // The audio is essentially silent. Skip ONNX and FFTs!
-                // Push a 0.0f probability to gracefully glide down the envelope
-                pushAndAveragePrediction(0.0f);
-            }
-            else 
-            {
-                // The audio is loud enough to matter. Run the heavy ML math.
-                const float* inData = dawHopBuffer.data();
-                float* outData = resampledHopBuffer.data();
-                
-                resampler.process(dawSampleRate / 16000.0, inData, outData, 800);
-
-                std::memmove(rolling16kBuffer.data(), 
-                             rolling16kBuffer.data() + 800, 
-                             15200 * sizeof(float));
-                             
-                std::memcpy(rolling16kBuffer.data() + 15200, 
-                            resampledHopBuffer.data(), 
-                            800 * sizeof(float));
-
-                computeLogMels(rolling16kBuffer);
-
-                if (onnxSession != nullptr && !threadShouldExit())
-                {
-                    try {
-                        runONNXModel(); // This updates predictionHistory & gateProbability internally
-                    } 
-                    catch (const Ort::Exception& e) {
-                        juce::Logger::writeToLog("ONNX RUN ERROR: " + juce::String(e.what()));
-                        wait(1000); 
-                    }
-                }
-            }
+            processMLHop(dawHopBuffer.data());
         }
         else
         {
-            mlTriggerEvent.wait(100);
+            mlTriggerEvent.wait(10); // Check more frequently (10ms instead of 100ms)
         }
     }
 }
