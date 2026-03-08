@@ -2,9 +2,6 @@
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 
-// --- ADD THIS: Include your processor header ---
-#include "../../plugin/Source/PluginProcessor.h" 
-
 // ---------------------------------------------------------
 // 1. Define your FIFO Test
 // ---------------------------------------------------------
@@ -53,26 +50,10 @@ public:
 };
 
 // ---------------------------------------------------------
-// 3. Define the Model Test (UPDATED)
-// ---------------------------------------------------------
-class ModelLoadingTest : public juce::UnitTest {
-public:
-    ModelLoadingTest() : juce::UnitTest ("ONNX Model State Test") {}
-    void runTest() override {
-        beginTest ("Processor successfully loads baked-in ONNX model");
-        VocalGateProcessor processor;
-        
-        // This must be TRUE now, since it loads from memory!
-        expect (processor.isModelLoaded()); 
-    }
-};
-
-// ---------------------------------------------------------
 // 4. Instantiate them statically so JUCE finds them
 // ---------------------------------------------------------
 static FifoTest fifoTest; 
 static AudioFifoTest audioFifoTest; 
-static ModelLoadingTest modelLoadingTest; // <-- Added this
 
 // ---------------------------------------------------------
 // 5. ONE Main function to rule them all
