@@ -53,22 +53,17 @@ public:
 };
 
 // ---------------------------------------------------------
-// 3. Define the Missing Model Test (NEW)
+// 3. Define the Model Test (UPDATED)
 // ---------------------------------------------------------
 class ModelLoadingTest : public juce::UnitTest {
 public:
     ModelLoadingTest() : juce::UnitTest ("ONNX Model State Test") {}
-    
     void runTest() override {
-        beginTest ("Processor gracefully handles missing ONNX file");
-        
-        // Instantiate the processor. It will attempt to load the ONNX file
-        // from the system directory in its constructor.
+        beginTest ("Processor successfully loads baked-in ONNX model");
         VocalGateProcessor processor;
-
-        // Since the CI/test environment does not have the .onnx file installed 
-        // at the hardcoded path, this should not crash, and the boolean should be false.
-        expect (! processor.isModelLoaded());
+        
+        // This must be TRUE now, since it loads from memory!
+        expect (processor.isModelLoaded()); 
     }
 };
 

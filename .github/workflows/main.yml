@@ -44,8 +44,8 @@ jobs:
 
     - name: Bypass CMake ONNX Requirement
       run: |
-        # 4. Changed the dummy file name to match your Vocal Gate ONNX file
-        mkdir -p plugin # Just in case the folder isn't tracked yet
+        # Changed the dummy file name to match your Vocal Gate ONNX file
+        mkdir -p plugin 
         touch plugin/vocalgate_int8.onnx
 
     - name: Configure CMake
@@ -55,5 +55,8 @@ jobs:
       run: cmake --build build --target RunCPPTests --parallel 4 
 
     - name: Run CTest
+      # ADD THIS ENV BLOCK: Explicitly point to the ONNX lib directory
+      env:
+        DYLD_LIBRARY_PATH: ${{ github.workspace }}/plugin/onnxruntime/lib
       run: ctest --test-dir build --output-on-failure
 
