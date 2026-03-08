@@ -7,6 +7,52 @@
 #include <algorithm> // For std::max
 #include <BinaryData.h>
 
+juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    // 1. Threshold
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"threshold", 1}, "Threshold", 0.001f, 0.999f, 0.50f));
+
+    // 2. Floor
+    juce::NormalisableRange<float> floorRange (-100.0f, 0.0f, 0.1f);
+    floorRange.setSkewForCentre (-18.0f);
+    auto floorAttributes = juce::AudioParameterFloatAttributes()
+        .withStringFromValueFunction([] (float value, int) {
+            if (value <= -99.9f) return juce::String ("-inf");
+            return juce::String (value, 1); 
+        });
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"floor", 1}, "Floor", floorRange, -25.0f, floorAttributes));
+
+    // 3. Attack
+    juce::NormalisableRange<float> attackRange (1.0f, 500.0f, 0.1f);
+    attackRange.setSkewForCentre (20.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"attack", 1}, "Attack", attackRange, 10.0f));
+
+    // 4. Release
+    juce::NormalisableRange<float> releaseRange (10.0f, 2000.0f, 0.1f);
+    releaseRange.setSkewForCentre (150.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"release", 1}, "Release", releaseRange, 150.0f));
+
+    // 5. Shift
+    juce::NormalisableRange<float> shiftRange (-100.0f, 200.0f, 0.1f);
+    shiftRange.setSkewForCentre (0.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"shift", 1}, "Shift", shiftRange, 0.0f));
+
+    // 6. P Smooth
+    juce::NormalisableRange<float> probSmoothRange (100.0f, 1200.0f, 1.0f);
+    probSmoothRange.setSkewForCentre (400.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"probsmoothing", 1}, "P Smooth", probSmoothRange, 400.0f));
+
+    return { params.begin(), params.end() };
+}
+
 VocalGateProcessor::VocalGateProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
@@ -17,49 +63,17 @@ VocalGateProcessor::VocalGateProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-       juce::Thread ("ONNX_ML_Thread") 
+       juce::Thread ("ONNX_ML_Thread"),
+       apvts(*this, nullptr, "Parameters", createParameterLayout()) 
 #endif
 {
-    // --- 1. Floor (Already good!) ---
-    juce::NormalisableRange<float> floorRange (-100.0f, 0.0f, 0.1f);
-    floorRange.setSkewForCentre (-18.0f);
-    auto floorAttributes = juce::AudioParameterFloatAttributes()
-        .withStringFromValueFunction([] (float value, int maximumStringLength) 
-        {
-            if (value <= -99.9f) return juce::String ("-inf");
-            return juce::String (value, 1); 
-        });
-
-    // --- 2. Attack (Skewed for fast transients) ---
-    juce::NormalisableRange<float> attackRange (1.0f, 500.0f, 0.1f);
-    attackRange.setSkewForCentre (20.0f);
-
-    // --- 3. Release (Skewed for typical vocal tails) ---
-    juce::NormalisableRange<float> releaseRange (10.0f, 2000.0f, 0.1f);
-    releaseRange.setSkewForCentre (150.0f);
-
-    // --- 4. Shift (Skewed so 0ms is exactly dead-center on the knob) ---
-    juce::NormalisableRange<float> shiftRange (-100.0f, 200.0f, 0.1f);
-    shiftRange.setSkewForCentre (0.0f);
-
-    // --- 5. P Smooth (Skewed so 400ms is perfectly at 12 o'clock) ---
-    juce::NormalisableRange<float> probSmoothRange (100.0f, 1200.0f, 1.0f);
-    probSmoothRange.setSkewForCentre (400.0f);
-
-    // --- Create and Add the Parameters ---
-    thresholdParam = new juce::AudioParameterFloat("threshold", "Threshold", 0.001f, 0.999f, 0.50f);
-    floorParam = new juce::AudioParameterFloat("floor", "Floor", floorRange, -25.0f, floorAttributes);
-    attackParam  = new juce::AudioParameterFloat("attack", "Attack", attackRange, 10.0f);
-    releaseParam = new juce::AudioParameterFloat("release", "Release", releaseRange, 150.0f);
-    shiftParam   = new juce::AudioParameterFloat("shift", "Shift", shiftRange, 0.0f);
-    probSmoothingParam = new juce::AudioParameterFloat("probsmoothing", "P Smooth", probSmoothRange, 400.0f);
-
-    addParameter(thresholdParam);
-    addParameter(floorParam);
-    addParameter(attackParam);
-    addParameter(releaseParam);
-    addParameter(shiftParam);
-    addParameter(probSmoothingParam);
+    // Grab the atomic pointers so the audio thread can read them instantly without locking
+    thresholdParam     = apvts.getRawParameterValue("threshold");
+    floorParam         = apvts.getRawParameterValue("floor");
+    attackParam        = apvts.getRawParameterValue("attack");
+    releaseParam       = apvts.getRawParameterValue("release");
+    shiftParam         = apvts.getRawParameterValue("shift");
+    probSmoothingParam = apvts.getRawParameterValue("probsmoothing");
 
     Ort::SessionOptions sessionOptions;
     sessionOptions.SetIntraOpNumThreads(1);
@@ -96,40 +110,19 @@ VocalGateProcessor::~VocalGateProcessor()
 
 void VocalGateProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // Create an outer XML element
-    juce::XmlElement xml ("VOCAL_GATE_SETTINGS");
-
-    // Store the current values
-    xml.setAttribute ("threshold", thresholdParam->get());
-    xml.setAttribute ("floor", floorParam->get());
-    xml.setAttribute ("attack", attackParam->get());
-    xml.setAttribute ("release", releaseParam->get());
-    xml.setAttribute ("shift", shiftParam->get());
-    xml.setAttribute ("probsmoothing", probSmoothingParam->get());
-
-    // Save it to the memory block
-    copyXmlToBinary (xml, destData);
+    // APVTS handles the XML mapping automatically
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);
 }
 
 void VocalGateProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // Retrieve the XML from the DAW's saved memory block
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
     if (xmlState != nullptr)
-    {
-        // Make sure it's our plugin's state
-        if (xmlState->hasTagName ("VOCAL_GATE_SETTINGS"))
-        {
-            // Restore the values (with fallbacks to current values just in case)
-            *thresholdParam = (float) xmlState->getDoubleAttribute ("threshold", thresholdParam->get());
-            *floorParam = (float) xmlState->getDoubleAttribute ("floor", floorParam->get());
-            *attackParam = (float) xmlState->getDoubleAttribute ("attack", attackParam->get());
-            *releaseParam = (float) xmlState->getDoubleAttribute ("release", releaseParam->get());
-            *shiftParam = (float) xmlState->getDoubleAttribute ("shift", shiftParam->get());
-            *probSmoothingParam = (float) xmlState->getDoubleAttribute ("probsmoothing", probSmoothingParam->get());
-        }
-    }
+        if (xmlState->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 void VocalGateProcessor::pushAndAveragePrediction(float rawProb)
@@ -139,7 +132,7 @@ void VocalGateProcessor::pushAndAveragePrediction(float rawProb)
     predictionWriteIndex = (predictionWriteIndex + 1) % maxPredictionFrames;
 
     // 2. Determine how many frames to average
-    float smoothMs = probSmoothingParam->get();
+    float smoothMs = probSmoothingParam->load();
     int framesToKeep = std::max(1, static_cast<int>(smoothMs / 50.0f));
     framesToKeep = std::min(framesToKeep, maxPredictionFrames); // Safety clamp
 
@@ -184,7 +177,7 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     smoothedDelay.reset(sampleRate, 0.05); 
     
     // Calculate the initial delay time so it starts perfectly in place
-    float initialShift = shiftParam->get();
+    float initialShift = shiftParam->load();
     float initialDelay = lookaheadSamples - (initialShift * (sampleRate / 1000.0f));
     smoothedDelay.setCurrentAndTargetValue(initialDelay);
 
@@ -198,13 +191,13 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     smoothedRelease.reset(sampleRate, rampTimeSeconds);
 
     // Snap them immediately to the current knob positions so they don't fade in from zero
-    smoothedThreshold.setCurrentAndTargetValue(thresholdParam->get());
-    smoothedFloorDB.setCurrentAndTargetValue(floorParam->get());
-    smoothedAttack.setCurrentAndTargetValue(attackParam->get());
-    smoothedRelease.setCurrentAndTargetValue(releaseParam->get());
+    smoothedThreshold.setCurrentAndTargetValue(thresholdParam->load());
+    smoothedFloorDB.setCurrentAndTargetValue(floorParam->load());
+    smoothedAttack.setCurrentAndTargetValue(attackParam->load());
+    smoothedRelease.setCurrentAndTargetValue(releaseParam->load());
 
     // --- Pre-allocate ML Thread Memory ---
-    int dawSamplesPerHop = static_cast<int>(sampleRate * 0.05);
+    dawSamplesPerHop = static_cast<int>(sampleRate * 0.05);
     
     dawHopBuffer.assign(dawSamplesPerHop, 0.0f);
     resampledHopBuffer.assign(800, 0.0f);
@@ -239,25 +232,28 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     int numSamples = buffer.getNumSamples();
 
     // --- 1. PUSH TO ML FIFO (Undelayed Audio) ---
-    // We MUST send the real-time audio to the neural network before we delay it!
     const float* leftChannelIn = buffer.getReadPointer(0);
     if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
     {
         audioFifo->push (leftChannelIn, numSamples);
+        
+        // WAKE UP THE ML THREAD IF WE HAVE ENOUGH DATA!
+        if (audioFifo->getNumReady() >= dawSamplesPerHop)
+            mlTriggerEvent.signal();
     }
 
     // --- 2. PUSH TO DELAY LINE (Smoothed to prevent clicks!) ---
-    float shiftMs = shiftParam->get();
+    float shiftMs = shiftParam->load();
     float targetDelaySamples = lookaheadSamples - (shiftMs * (dawSampleRate / 1000.0f));
     targetDelaySamples = juce::jlimit(0.0f, (float)delayLine.getMaximumDelayInSamples() - 1.0f, targetDelaySamples);
     
     // Tell the smoother where we want to go
     smoothedDelay.setTargetValue(targetDelaySamples);
 
-    smoothedThreshold.setTargetValue(thresholdParam->get());
-    smoothedFloorDB.setTargetValue(floorParam->get());
-    smoothedAttack.setTargetValue(attackParam->get());
-    smoothedRelease.setTargetValue(releaseParam->get());
+    smoothedThreshold.setTargetValue(thresholdParam->load());
+    smoothedFloorDB.setTargetValue(floorParam->load());
+    smoothedAttack.setTargetValue(attackParam->load());
+    smoothedRelease.setTargetValue(releaseParam->load());
     
     int numChannels = getTotalNumInputChannels();
     
@@ -379,50 +375,56 @@ void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)
 
 void VocalGateProcessor::runONNXModel()
 {
-    // 1. Define ONNX Tensor Shapes (memoryInfo is now pulled from the class member)
-    std::vector<int64_t> inputShape = {1, 1, 40, 61};
-    
-    // Create the input tensor pointing to our MFCC array using the pre-allocated memoryInfo
+    // 1. Create the input tensor wrapper
     Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
         memoryInfo, 
-        const_cast<float*>(logMelFeatures.data()), 
+        logMelFeatures.data(), 
         logMelFeatures.size(), 
-        inputShape.data(), 
-        inputShape.size()
+        inputShape, 
+        4 // size of inputShape array
+    );
+
+    // 2. Create the output tensor wrapper pointing to our pre-allocated array!
+    Ort::Value outputTensor = Ort::Value::CreateTensor<float>(
+        memoryInfo,
+        outputLogitData.data(),
+        outputLogitData.size(),
+        outputShape,
+        2 // size of outputShape array (change to 1 if shape is {1})
     );
 
     const char* inputNames[] = {"input_log_mel"};
     const char* outputNames[] = {"gate_logit"};
 
-    // 2. Run the Model
-    auto outputTensors = onnxSession->Run(
+    // 3. Run the Model (Zero allocations happen here now)
+    onnxSession->Run(
         Ort::RunOptions{nullptr}, 
         inputNames, 
         &inputTensor, 
         1, 
         outputNames, 
+        &outputTensor, // Pass the pre-allocated tensor here
         1
     );
 
-    // 3. Extract the Logit and Apply Sigmoid
-    float* outLogit = outputTensors.front().GetTensorMutableData<float>();
-    float rawProb = 1.0f / (1.0f + std::exp(-outLogit[0]));
+    // 4. Extract the Logit and Apply Sigmoid
+    // ONNX has written directly into outputLogitData[0]
+    float rawProb = 1.0f / (1.0f + std::exp(-outputLogitData[0]));
 
-    // 4. APPLY MOVING AVERAGE (Allocation-Free)
+    // 5. APPLY MOVING AVERAGE
     pushAndAveragePrediction(rawProb);
 }
 
 // --- The Background ML Thread ---
 void VocalGateProcessor::run()
-{
-    int dawSamplesPerHop = static_cast<int>(dawSampleRate * 0.05);
-    
+{    
     // Calculate our "silence" threshold (-50 dB converted to linear gain)
     // -50 dB is roughly 0.00316
     const float silenceThreshold = juce::Decibels::decibelsToGain(-50.0f);
 
     while (! threadShouldExit())
     {
+        // Loop to process all available hops in case we fell behind
         if (audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop)
         {
             audioFifo->pop(dawHopBuffer.data(), dawSamplesPerHop);
@@ -472,7 +474,7 @@ void VocalGateProcessor::run()
         }
         else
         {
-            wait(10);
+            mlTriggerEvent.wait(100);
         }
     }
 }

@@ -4,7 +4,6 @@
 #include <juce_dsp/juce_dsp.h>
 #include <onnxruntime_cxx_api.h>
 #include "AudioFIFO.h"
-#include <juce_dsp/juce_dsp.h> // Ensure this is included at the top
 
 class VocalGateProcessor : public juce::AudioProcessor, public juce::Thread
 {
@@ -38,13 +37,7 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    // The Editor writes to this, the Processor reads from it
-    juce::AudioParameterFloat* thresholdParam;
-    juce::AudioParameterFloat* floorParam;
-    juce::AudioParameterFloat* attackParam;
-    juce::AudioParameterFloat* releaseParam;
-    juce::AudioParameterFloat* shiftParam;
-    juce::AudioParameterFloat* probSmoothingParam; // <--- ADD THIS KNOB
+    juce::AudioProcessorValueTreeState apvts;
 
     // The Processor updates this, the Editor reads it for the visualizer
     std::atomic<float> inputLevel { 0.0f };
@@ -79,8 +72,16 @@ private:
     Ort::Env onnxEnv{ORT_LOGGING_LEVEL_WARNING, "VocalGate"};
     std::unique_ptr<Ort::Session> onnxSession;
     
-    // Add this line right here:
+    // --- Plugin Memory ---
     Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    std::atomic<float>* thresholdParam = nullptr;
+    std::atomic<float>* floorParam     = nullptr;
+    std::atomic<float>* attackParam    = nullptr;
+    std::atomic<float>* releaseParam   = nullptr;
+    std::atomic<float>* shiftParam     = nullptr;
+    std::atomic<float>* probSmoothingParam = nullptr;
 
     // --- Delay / Lookahead ---
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 96000 };
@@ -93,7 +94,7 @@ private:
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedProbability;
 
-    // --- Pre-allocated Memory (Avoids Heap Thrashing) ---
+    //// --- Pre-allocated Memory (Avoids Heap Thrashing) ---
     std::vector<float> dawHopBuffer;
     std::vector<float> resampledHopBuffer;
     std::vector<float> rolling16kBuffer;
@@ -103,9 +104,18 @@ private:
     std::vector<float> powerSpec;
     std::vector<float> melEnergies;
 
+    // ADD THESE: Pre-allocated output buffer and static tensor shapes
+    std::array<float, 1> outputLogitData { 0.0f }; 
+    static constexpr int64_t inputShape[] = {1, 1, 40, 61};
+    static constexpr int64_t outputShape[] = {1, 1}; // Note: Change to {1} if your model expects a 1D tensor
+
     // Move FFT and Resampler here so they only initialize once
     juce::dsp::FFT forwardFFT { 9 }; 
     juce::LagrangeInterpolator resampler;
+
+    // --- Thread Synchronization ---
+    juce::WaitableEvent mlTriggerEvent;
+    int dawSamplesPerHop = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VocalGateProcessor)
 };

@@ -7,10 +7,10 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
 {
     setSize (600, 300); 
 
-    // Updated lambda to accept a color for the pointer
+    // Updated lambda: takes a const juce::String& paramID instead of an atomic pointer
     auto setupKnob = [this](juce::Slider& slider, juce::Label& label, const juce::String& text, 
-                            const juce::String& suffix, auto* param, 
-                            std::unique_ptr<juce::SliderParameterAttachment>& attachment,
+                            const juce::String& suffix, const juce::String& paramID, 
+                            std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attachment,
                             juce::Colour pointerColor) 
     {
         slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -20,10 +20,13 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
         // Apply our custom LookAndFeel and color
         slider.setLookAndFeel(&customKnobLookAndFeel);
         slider.setColour(juce::Slider::thumbColourId, pointerColor);
-        slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack); // Clean up the text box
+        slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
 
         addAndMakeVisible(slider);
-        attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider, nullptr);
+        
+        // Use the APVTS attachment, passing the APVTS, the parameter ID string, and the slider
+        attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            audioProcessor.apvts, paramID, slider);
 
         label.setText(text, juce::dontSendNotification);
         label.attachToComponent(&slider, false);
@@ -34,16 +37,16 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
 
     // --- Define your theme colors ---
     juce::Colour detectionColor = juce::Colours::darkorange;
-    juce::Colour envelopeColor = juce::Colour::fromRGB(40, 210, 180); // Cyan matching the audio output
+    juce::Colour envelopeColor = juce::Colour::fromRGB(40, 210, 180);
 
-    // --- Apply them to the knobs ---
-    setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", audioProcessor.thresholdParam, thresholdAttachment, detectionColor);
-    setupKnob(floorSlider, floorLabel, "Floor", " dB", audioProcessor.floorParam, floorAttachment, detectionColor);
-    setupKnob(probSmoothSlider, probSmoothLabel, "P Smooth", " ms", audioProcessor.probSmoothingParam, probSmoothAttachment, detectionColor);
+    // --- Apply them to the knobs using the Parameter IDs string ---
+    setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", "threshold", thresholdAttachment, detectionColor);
+    setupKnob(floorSlider, floorLabel, "Floor", " dB", "floor", floorAttachment, detectionColor);
+    setupKnob(probSmoothSlider, probSmoothLabel, "P Smooth", " ms", "probsmoothing", probSmoothAttachment, detectionColor);
 
-    setupKnob(attackSlider, attackLabel, "Attack", " ms", audioProcessor.attackParam, attackAttachment, envelopeColor);
-    setupKnob(releaseSlider, releaseLabel, "Release", " ms", audioProcessor.releaseParam, releaseAttachment, envelopeColor);
-    setupKnob(shiftSlider, shiftLabel, "Shift", " ms", audioProcessor.shiftParam, shiftAttachment, envelopeColor);
+    setupKnob(attackSlider, attackLabel, "Attack", " ms", "attack", attackAttachment, envelopeColor);
+    setupKnob(releaseSlider, releaseLabel, "Release", " ms", "release", releaseAttachment, envelopeColor);
+    setupKnob(shiftSlider, shiftLabel, "Shift", " ms", "shift", shiftAttachment, envelopeColor);
 
     startTimerHz(60); 
 }
@@ -102,12 +105,12 @@ void VocalGateEditor::paint (juce::Graphics& g)
     for (int i = 0; i < historySize; ++i)
     {
         // 1. Audio Read Index (Normal circular buffer read)
-        int audioReadIndex = (writeIndex + i) % historySize;
+        size_t audioReadIndex = (writeIndex + static_cast<size_t>(i)) % historySize;
         
         // 2. Prob Read Index (Clamped to prevent the wrap-around glitch!)
         // Instead of letting it loop, we clamp 'i + offsetFrames' to stay within our history limits
-        int logicalProbIndex = juce::jlimit(0, historySize - 1, i + offsetFrames);
-        int probReadIndex = (writeIndex + logicalProbIndex) % historySize;
+        size_t logicalProbIndex = static_cast<size_t>(juce::jlimit(0, static_cast<int>(historySize) - 1, i + offsetFrames));
+        size_t probReadIndex = (writeIndex + logicalProbIndex) % historySize;
 
         float x = audioArea.getX() + (i * xStep);
         

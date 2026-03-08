@@ -62,27 +62,27 @@ private:
 
     juce::Slider thresholdSlider;
     juce::Label thresholdLabel;
-    std::unique_ptr<juce::SliderParameterAttachment> thresholdAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;
     
     juce::Slider floorSlider;
     juce::Label floorLabel;
-    std::unique_ptr<juce::SliderParameterAttachment> floorAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> floorAttachment;
 
     juce::Slider attackSlider;
     juce::Label attackLabel;
-    std::unique_ptr<juce::SliderParameterAttachment> attackAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attackAttachment;
 
     juce::Slider releaseSlider;
     juce::Label releaseLabel;
-    std::unique_ptr<juce::SliderParameterAttachment> releaseAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> releaseAttachment;
 
     juce::Slider shiftSlider;
     juce::Label shiftLabel;
-    std::unique_ptr<juce::SliderParameterAttachment> shiftAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> shiftAttachment;
 
     juce::Slider probSmoothSlider;
     juce::Label probSmoothLabel;
-    std::unique_ptr<juce::SliderParameterAttachment> probSmoothAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> probSmoothAttachment;
     
     static constexpr int historySize = 120; 
     std::array<float, historySize> inputHistory { 0.0f };
