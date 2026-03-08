@@ -39,7 +39,8 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
     // --- Apply them to the knobs ---
     setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", audioProcessor.thresholdParam, thresholdAttachment, detectionColor);
     setupKnob(floorSlider, floorLabel, "Floor", " dB", audioProcessor.floorParam, floorAttachment, detectionColor);
-    
+    setupKnob(probSmoothSlider, probSmoothLabel, "P Smooth", " ms", audioProcessor.probSmoothingParam, probSmoothAttachment, detectionColor);
+
     setupKnob(attackSlider, attackLabel, "Attack", " ms", audioProcessor.attackParam, attackAttachment, envelopeColor);
     setupKnob(releaseSlider, releaseLabel, "Release", " ms", audioProcessor.releaseParam, releaseAttachment, envelopeColor);
     setupKnob(shiftSlider, shiftLabel, "Shift", " ms", audioProcessor.shiftParam, shiftAttachment, envelopeColor);
@@ -52,6 +53,7 @@ VocalGateEditor::~VocalGateEditor()
     // CRITICAL: You must remove the custom LookAndFeel before the editor is destroyed
     thresholdSlider.setLookAndFeel(nullptr);
     floorSlider.setLookAndFeel(nullptr);
+    probSmoothSlider.setLookAndFeel(nullptr); // <--- ADD THIS
     attackSlider.setLookAndFeel(nullptr);
     releaseSlider.setLookAndFeel(nullptr);
     shiftSlider.setLookAndFeel(nullptr);
@@ -147,25 +149,6 @@ void VocalGateEditor::paint (juce::Graphics& g)
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     float dashLengths[2] = { 4.0f, 4.0f };
     g.drawDashedLine(juce::Line<float>(probArea.getX(), threshY, probArea.getRight(), threshY), dashLengths, 2, 1.0f);
-
-    // --- 4. ML BRAIN ERROR OVERLAY (Add this at the very end of paint!) ---
-    if (! audioProcessor.isModelLoaded())
-    {
-        // Dim the entire graph area slightly to make the text pop
-        g.setColour (juce::Colours::black.withAlpha (0.6f));
-        g.fillRect (graphArea);
-
-        // Draw the main warning text
-        g.setColour (juce::Colours::red.brighter());
-        g.setFont (juce::Font (22.0f, juce::Font::bold));
-        g.drawFittedText ("MODEL MISSING: ML BRAIN OFFLINE", graphArea, juce::Justification::centred, 1);
-        
-        // Draw a helpful sub-text slightly below the center
-        g.setFont (juce::Font (14.0f));
-        g.setColour (juce::Colours::lightgrey);
-        g.drawFittedText ("Could not find vocalgate_int8.onnx on this system.", 
-                          graphArea.translated(0, 25), juce::Justification::centred, 1);
-    }
 }
 
 void VocalGateEditor::resized()
@@ -176,11 +159,15 @@ void VocalGateEditor::resized()
     int squeezePixels = 40; 
     bottomArea = bottomArea.withTrimmedLeft(squeezePixels).withTrimmedRight(squeezePixels);
     
-    int knobWidth = bottomArea.getWidth() / 5; // 5 narrower columns
+    // CHANGE THIS: Divide by 6 columns instead of 5
+    int knobWidth = bottomArea.getWidth() / 6; 
     int shiftDown = 8;
 
+    // Lay them out sequentially from left to right
     thresholdSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     floorSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    probSmoothSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    
     attackSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     releaseSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     shiftSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));

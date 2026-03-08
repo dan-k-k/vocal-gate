@@ -31,6 +31,12 @@ juce_add_plugin(VocalGate
 # Explicitly generate the JUCE header (from your StemExtractor)
 juce_generate_juce_header(VocalGate)
 
+juce_add_binary_data(VocalGateData
+    SOURCES
+        # Assumes the model is next to CMakeLists.txt. Adjust the path if it's in a subfolder.
+        vocalgate_int8.onnx 
+)
+
 # 3. Add Source Files
 target_sources(VocalGate
     PRIVATE
@@ -51,6 +57,7 @@ target_compile_definitions(VocalGate
 # 5. Link JUCE Modules and ONNX Runtime
 target_link_libraries(VocalGate
     PRIVATE
+        VocalGateData # <--- ADD THIS LINE
         juce::juce_audio_utils
         juce::juce_dsp
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib
@@ -115,6 +122,7 @@ add_executable(RunCPPTests
 # 2. Link the JUCE modules AND the ONNX Runtime library
 target_link_libraries(RunCPPTests 
     PRIVATE 
+        VocalGateData # <--- ADD THIS HERE!
         juce::juce_audio_utils 
         juce::juce_dsp
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib

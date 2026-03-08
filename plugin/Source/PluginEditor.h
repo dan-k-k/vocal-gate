@@ -79,6 +79,10 @@ private:
     juce::Slider shiftSlider;
     juce::Label shiftLabel;
     std::unique_ptr<juce::SliderParameterAttachment> shiftAttachment;
+
+    juce::Slider probSmoothSlider;
+    juce::Label probSmoothLabel;
+    std::unique_ptr<juce::SliderParameterAttachment> probSmoothAttachment;
     
     static constexpr int historySize = 120; 
     std::array<float, historySize> inputHistory { 0.0f };

@@ -35,8 +35,8 @@ public:
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
-    void getStateInformation (juce::MemoryBlock&) override {}
-    void setStateInformation (const void*, int) override {}
+    void getStateInformation (juce::MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
 
     // The Editor writes to this, the Processor reads from it
     juce::AudioParameterFloat* thresholdParam;
@@ -44,13 +44,11 @@ public:
     juce::AudioParameterFloat* attackParam;
     juce::AudioParameterFloat* releaseParam;
     juce::AudioParameterFloat* shiftParam;
+    juce::AudioParameterFloat* probSmoothingParam; // <--- ADD THIS KNOB
 
     // The Processor updates this, the Editor reads it for the visualizer
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
-
-        // We use atomic so the background thread can update it and the audio thread 
-    // can read it simultaneously without data races.
     std::atomic<float> gateProbability { 0.0f }; 
 
 private:
@@ -61,6 +59,10 @@ private:
 
     // --- Buffering & Threading ---
     std::unique_ptr<AudioFIFO> audioFifo;
+    void pushAndAveragePrediction(float rawProb);
+    static constexpr int maxPredictionFrames = 32; // > 24 frames needed for 1200ms
+    std::array<float, maxPredictionFrames> predictionHistory { 0.0f };
+    int predictionWriteIndex = 0;
         
     // Smooths the gate movement in the audio thread (Attack/Release)
     float currentGainEnvelope = 1.0f;       
@@ -76,6 +78,9 @@ private:
     // --- ONNX Runtime ---
     Ort::Env onnxEnv{ORT_LOGGING_LEVEL_WARNING, "VocalGate"};
     std::unique_ptr<Ort::Session> onnxSession;
+    
+    // Add this line right here:
+    Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
     // --- Delay / Lookahead ---
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 96000 };
@@ -85,6 +90,8 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFloorDB;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedAttack;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRelease;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedProbability;
 
     // --- Pre-allocated Memory (Avoids Heap Thrashing) ---
     std::vector<float> dawHopBuffer;
