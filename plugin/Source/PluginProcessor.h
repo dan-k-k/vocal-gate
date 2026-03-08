@@ -53,7 +53,7 @@ private:
 
     // --- Buffering & Threading ---
     std::unique_ptr<AudioFIFO> audioFifo;
-    void pushAndAveragePrediction(float rawProb);
+    float pushAndAveragePrediction(float rawProb);
     static constexpr int maxPredictionFrames = 32; // > 24 frames needed for 1200ms
     std::array<float, maxPredictionFrames> predictionHistory { 0.0f };
     int predictionWriteIndex = 0;
@@ -87,13 +87,16 @@ private:
     // --- Delay / Lookahead ---
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 96000 };
     int lookaheadSamples = 0;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDelay;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedThreshold;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFloorDB;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedAttack;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRelease;
 
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedProbability;
+    // Add these under your private variables:
+    int probBufferSize = 0;
+    std::unique_ptr<std::atomic<float>[]> probRingBuffer;
+
+    // Tracks the exact absolute sample we are currently feeding into the ML model
+    uint64_t mlWriteIndex = 0; 
+
+    // Tracks the exact absolute sample we are currently processing in the audio thread
+    std::atomic<uint64_t> audioReadIndex { 0 }; 
 
     //// --- Pre-allocated Memory (Avoids Heap Thrashing) ---
     std::vector<float> dawHopBuffer;
@@ -115,7 +118,7 @@ private:
     juce::LagrangeInterpolator resampler;
 
     // --- Thread Synchronization ---
-    juce::WaitableEvent mlTriggerEvent;
+    std::atomic<bool> mlDataReady { false };
     int dawSamplesPerHop = 0;
 
     // --- Offline Buffer ---

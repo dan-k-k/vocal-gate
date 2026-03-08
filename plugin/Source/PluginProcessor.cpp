@@ -13,7 +13,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createPa
 
     // 1. Threshold
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"threshold", 1}, "Threshold", 0.001f, 0.999f, 0.50f));
+        juce::ParameterID{"threshold", 1}, "Threshold", 0.001f, 0.999f, 0.70f));
 
     // 2. Floor
     juce::NormalisableRange<float> floorRange (-100.0f, 0.0f, 0.1f);
@@ -125,29 +125,24 @@ void VocalGateProcessor::setStateInformation (const void* data, int sizeInBytes)
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
-void VocalGateProcessor::pushAndAveragePrediction(float rawProb)
+float VocalGateProcessor::pushAndAveragePrediction(float rawProb)
 {
-    // 1. Write the new prediction to the circular buffer
     predictionHistory[predictionWriteIndex] = rawProb;
     predictionWriteIndex = (predictionWriteIndex + 1) % maxPredictionFrames;
 
-    // 2. Determine how many frames to average
     float smoothMs = probSmoothingParam->load();
     int framesToKeep = std::max(1, static_cast<int>(smoothMs / 50.0f));
-    framesToKeep = std::min(framesToKeep, maxPredictionFrames); // Safety clamp
+    framesToKeep = std::min(framesToKeep, maxPredictionFrames);
 
-    // 3. Sum backwards from the most recently written index
     float sum = 0.0f;
     for (int i = 0; i < framesToKeep; ++i) 
     {
-        // (WriteIndex - 1) is the newest item. We subtract 'i' to go back in time, 
-        // and add maxPredictionFrames to ensure the modulo doesn't fail on negative numbers.
         int readIndex = (predictionWriteIndex - 1 - i + maxPredictionFrames) % maxPredictionFrames;
         sum += predictionHistory[readIndex];
     }
             
-    // 4. Update the atomic float for the audio thread and UI
-    gateProbability.store(sum / static_cast<float>(framesToKeep));
+    // RETURN the value instead of storing it in the atomic!
+    return sum / static_cast<float>(framesToKeep); 
 }
 
 void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -173,28 +168,23 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     spec.maximumBlockSize = samplesPerBlock;
     spec.numChannels = getTotalNumOutputChannels();
     
+    // 1. Setup the Probability Ring Buffer (2 seconds of safety)
+    probBufferSize = static_cast<int>(sampleRate * 2.0);
+    probRingBuffer = std::make_unique<std::atomic<float>[]>(probBufferSize);
+    for (int i = 0; i < probBufferSize; ++i) {
+        probRingBuffer[i].store(0.0f, std::memory_order_relaxed);
+    }
+
+    // Reset timelines
+    mlWriteIndex = 0;
+    audioReadIndex.store(0);
+
+    // 2. LOCK the audio delay line. No more smoothedDelay!
+    delayLine.setMaximumDelayInSamples(static_cast<int>(sampleRate * 2.0));
     delayLine.prepare(spec);
-    smoothedDelay.reset(sampleRate, 0.05); 
+    delayLine.setDelay(lookaheadSamples); // This never changes now.
     
-    // Calculate the initial delay time so it starts perfectly in place
-    float initialShift = shiftParam->load();
-    float initialDelay = lookaheadSamples - (initialShift * (sampleRate / 1000.0f));
-    smoothedDelay.setCurrentAndTargetValue(initialDelay);
-
-    delayLine.setDelay(initialDelay);
-
-    // Set the glide time to 20ms
-    double rampTimeSeconds = 0.02; 
-    smoothedThreshold.reset(sampleRate, rampTimeSeconds);
-    smoothedFloorDB.reset(sampleRate, rampTimeSeconds);
-    smoothedAttack.reset(sampleRate, rampTimeSeconds);
-    smoothedRelease.reset(sampleRate, rampTimeSeconds);
-
-    // Snap them immediately to the current knob positions so they don't fade in from zero
-    smoothedThreshold.setCurrentAndTargetValue(thresholdParam->load());
-    smoothedFloorDB.setCurrentAndTargetValue(floorParam->load());
-    smoothedAttack.setCurrentAndTargetValue(attackParam->load());
-    smoothedRelease.setCurrentAndTargetValue(releaseParam->load());
+    resampler.reset();
 
     // --- Pre-allocate ML Thread Memory ---
     dawSamplesPerHop = static_cast<int>(sampleRate * 0.05);
@@ -206,9 +196,6 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     predictionHistory.fill(0.0f);
     predictionWriteIndex = 0;
-
-    smoothedProbability.reset(sampleRate, 0.05); // 50ms glide to match the hop
-    smoothedProbability.setCurrentAndTargetValue(0.0f);
     
     logMelFeatures.assign(40 * 61, 0.0f);
     timeDomain.assign(512 * 2, 0.0f); 
@@ -251,100 +238,86 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     }
     else 
     {
-        // REALTIME PLAYBACK: Delegate to background thread to prevent audio glitches
+        // REALTIME PLAYBACK: Delegate to background thread
         if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
         {
             audioFifo->push (leftChannelIn, numSamples);
             if (audioFifo->getNumReady() >= dawSamplesPerHop)
-                mlTriggerEvent.signal(); // Wake up the thread
+            {
+                // Safely set the flag to true without blocking the audio thread
+                mlDataReady.store(true, std::memory_order_release); 
+            }
         }
     }
 
-    // --- 2. PUSH TO DELAY LINE (Smoothed to prevent clicks!) ---
-    float shiftMs = shiftParam->load();
-    float targetDelaySamples = lookaheadSamples - (shiftMs * (dawSampleRate / 1000.0f));
-    targetDelaySamples = juce::jlimit(0.0f, (float)delayLine.getMaximumDelayInSamples() - 1.0f, targetDelaySamples);
-    
-    // Tell the smoother where we want to go
-    smoothedDelay.setTargetValue(targetDelaySamples);
-
-    smoothedThreshold.setTargetValue(thresholdParam->load());
-    smoothedFloorDB.setTargetValue(floorParam->load());
-    smoothedAttack.setTargetValue(attackParam->load());
-    smoothedRelease.setTargetValue(releaseParam->load());
-    
-    int numChannels = getTotalNumInputChannels();
-    
-    // Process the delay line sample-by-sample to allow the smooth glide
-    for (int i = 0; i < numSamples; ++i)
-    {
-        // Get the interpolated delay time for this exact sample
-        delayLine.setDelay(smoothedDelay.getNextValue());
-
-        for (int ch = 0; ch < numChannels; ++ch)
-        {
-            float in = buffer.getSample(ch, i);
-            float out = delayLine.popSample(ch); // Read delayed audio
-            delayLine.pushSample(ch, in);        // Write new audio
-            buffer.setSample(ch, i, out);        // Overwrite buffer with delayed audio
-        }
-    }
-
-    // --- 3. MEASURE DELAYED INPUT PEAK ---
-    float currentInPeak = 0.0f;
-    const float* delayedInL = buffer.getReadPointer(0);
-    for (int i = 0; i < numSamples; ++i) {
-        currentInPeak = std::max(currentInPeak, std::abs(delayedInL[i]));
-    }
-    inputLevel.store(currentInPeak);
-
-    // Read the ML brain once per block
-    float currentProb = gateProbability.load(); 
-
-    float* outL = buffer.getWritePointer(0);
-    float* outR = (getTotalNumInputChannels() > 1) ? buffer.getWritePointer(1) : nullptr;
-    float currentOutPeak = 0.0f;
-
-    // --- NEW: Calculate Exp Coefficients ONCE per block ---
-    // We grab the current value of the smoother at the start of the block
-    float currentAttackMs = smoothedAttack.getCurrentValue();
-    float currentReleaseMs = smoothedRelease.getCurrentValue();
+    float currentThreshold = thresholdParam->load();
+    float currentFloorDB = floorParam->load();
+    float currentAttackMs = attackParam->load();
+    float currentReleaseMs = releaseParam->load();
 
     float attackCoef = std::exp(-1.0f / (currentAttackMs * 0.001f * dawSampleRate));
     float releaseCoef = std::exp(-1.0f / (currentReleaseMs * 0.001f * dawSampleRate));
 
-    // --- 4. APPLY GATE ENVELOPES (Sample-by-Sample) ---
+    float duckingGain = (currentFloorDB <= -99.9f) ? 0.0f : juce::Decibels::decibelsToGain(currentFloorDB);
+
+    // Calculate shift in samples
+    int halfWindowSamples = static_cast<int>(dawSampleRate * 0.5); // 500ms offset
+    float shiftMs = shiftParam->load();
+    int shiftSamples = static_cast<int>(shiftMs * (dawSampleRate / 1000.0f));
+
+    int numChannels = getTotalNumInputChannels();
+    float* outL = buffer.getWritePointer(0);
+    float* outR = (numChannels > 1) ? buffer.getWritePointer(1) : nullptr;
+
+    float currentInPeak = 0.0f;
+    float currentOutPeak = 0.0f;
+    uint64_t localReadIndex = audioReadIndex.load(std::memory_order_relaxed);
+
     for (int i = 0; i < numSamples; ++i)
     {
-        // Advance smoothers for threshold and floor to prevent zipper noise
-        float currentThreshold = smoothedThreshold.getNextValue();
-        float currentFloorDB = smoothedFloorDB.getNextValue();
-        
-        // We still need to call getNextValue() on Attack/Release so the smoothers 
-        // advance their internal state, even if we aren't using the per-sample output here.
-        smoothedAttack.getNextValue();
-        smoothedRelease.getNextValue();
+        // 1. Process Fixed Audio Delay
+        float inL = buffer.getSample(0, i);
+        float delayedL = delayLine.popSample(0);
+        delayLine.pushSample(0, inL);
+        outL[i] = delayedL;
 
-        // Calculate target gain
-        float duckingGain = (currentFloorDB <= -99.9f) ? 0.0f : juce::Decibels::decibelsToGain(currentFloorDB);
-        float targetGain = (currentProb >= currentThreshold) ? duckingGain : 1.0f;
+        if (outR != nullptr) {
+            float inR = buffer.getSample(1, i);
+            float delayedR = delayLine.popSample(1);
+            delayLine.pushSample(1, inR);
+            outR[i] = delayedR;
+        }
 
-        // Apply envelopes using our pre-calculated block-rate coefficients
+        // 2. Read the Synchronized Probability
+        int64_t syncedIndex = localReadIndex - lookaheadSamples + halfWindowSamples + shiftSamples;
+        int readPos = static_cast<int>(syncedIndex % probBufferSize); 
+        if (readPos < 0) { readPos += probBufferSize; }
+
+        float currentProb = probRingBuffer[readPos].load(std::memory_order_relaxed);
+        gateProbability.store(currentProb, std::memory_order_relaxed);
+
+        // 3. Apply the Gate Envelope (FLIPPED LOGIC HERE!)
+        float targetGain = (currentProb < currentThreshold) ? 1.0f : duckingGain;
+
         if (targetGain < currentGainEnvelope) {
             currentGainEnvelope = attackCoef * currentGainEnvelope + (1.0f - attackCoef) * targetGain;
-        } 
-        else {
+        } else {
             currentGainEnvelope = releaseCoef * currentGainEnvelope + (1.0f - releaseCoef) * targetGain;
         }
 
         outL[i] *= currentGainEnvelope;
+        if (outR != nullptr) outR[i] *= currentGainEnvelope;
+
+        currentInPeak = std::max(currentInPeak, std::abs(delayedL));
         currentOutPeak = std::max(currentOutPeak, std::abs(outL[i]));
 
-        if (outR != nullptr)
-            outR[i] *= currentGainEnvelope;
+        localReadIndex++; 
     }
 
-    // --- 6. STORE OUTPUT PEAK ---
+    audioReadIndex.store(localReadIndex, std::memory_order_relaxed);
+
+    // --- 6. STORE PEAKS ---
+    inputLevel.store(currentInPeak);  // <--- ADD THIS BACK
     outputLevel.store(currentOutPeak);
 }
 
@@ -393,9 +366,6 @@ void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)
 
 void VocalGateProcessor::processMLHop(const float* hopData)
 {
-    // Lock to ensure thread safety over shared vectors (rolling16kBuffer, etc.)
-    std::lock_guard<std::mutex> lock(mlMutex); 
-
     const float silenceThreshold = juce::Decibels::decibelsToGain(-50.0f);
     
     float peakLevel = 0.0f;
@@ -405,7 +375,16 @@ void VocalGateProcessor::processMLHop(const float* hopData)
 
     if (peakLevel < silenceThreshold) 
     {
-        pushAndAveragePrediction(0.0f);
+        // Get the smoothed 0.0 probability
+        float smoothedProb = pushAndAveragePrediction(0.0f);
+        
+        // Write it into the timeline just like the real model does
+        for (int i = 0; i < dawSamplesPerHop; ++i) 
+        {
+            int writePos = (mlWriteIndex + i) % probBufferSize;
+            probRingBuffer[writePos].store(smoothedProb, std::memory_order_relaxed);
+        }
+        mlWriteIndex += dawSamplesPerHop;
     }
     else 
     {
@@ -463,11 +442,20 @@ void VocalGateProcessor::runONNXModel()
     );
 
     // 4. Extract the Logit and Apply Sigmoid
-    // ONNX has written directly into outputLogitData[0]
     float rawProb = 1.0f / (1.0f + std::exp(-outputLogitData[0]));
 
-    // 5. APPLY MOVING AVERAGE
-    pushAndAveragePrediction(rawProb);
+    // Get the smoothed probability using the function we just fixed
+    float finalProb = pushAndAveragePrediction(rawProb); 
+
+    // Write this probability across the entire chunk of samples it represents
+    for (int i = 0; i < dawSamplesPerHop; ++i) 
+    {
+        int writePos = (mlWriteIndex + i) % probBufferSize;
+        probRingBuffer[writePos].store(finalProb, std::memory_order_relaxed);
+    }
+
+    // Advance the ML write index by exactly one hop size
+    mlWriteIndex += dawSamplesPerHop;
 }
 
 // --- The Background ML Thread ---
@@ -475,15 +463,24 @@ void VocalGateProcessor::run()
 {    
     while (! threadShouldExit())
     {
-        // Only process on the background thread if we are in REALTIME
-        if (!isNonRealtime() && audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop)
+        // 1. Check if the audio thread told us data is ready, OR if the FIFO just has enough data
+        if (mlDataReady.load(std::memory_order_acquire) || 
+           (!isNonRealtime() && audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop))
         {
-            audioFifo->pop(dawHopBuffer.data(), dawSamplesPerHop);
-            processMLHop(dawHopBuffer.data());
+            // 2. Process ALL available hops in case we fell slightly behind
+            while (audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop && !threadShouldExit())
+            {
+                audioFifo->pop(dawHopBuffer.data(), dawSamplesPerHop);
+                processMLHop(dawHopBuffer.data());
+            }
+            
+            // 3. Reset the flag
+            mlDataReady.store(false, std::memory_order_release);
         }
         else
         {
-            mlTriggerEvent.wait(10); // Check more frequently (10ms instead of 100ms)
+            // 4. Sleep for 5ms to save CPU power while waiting for the audio thread
+            juce::Thread::sleep(5); 
         }
     }
 }

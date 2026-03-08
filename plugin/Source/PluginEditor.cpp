@@ -78,12 +78,10 @@ void VocalGateEditor::paint (juce::Graphics& g)
     auto bounds = getLocalBounds();
     g.fillAll (juce::Colour::fromRGB (20, 20, 22));
 
-    // --- NEW LAYOUT MATH ---
     auto graphArea = bounds.withTrimmedBottom(110).withTrimmedTop(15).withTrimmedRight(20).withTrimmedLeft(20);
     auto audioArea = graphArea.removeFromTop(graphArea.getHeight() / 2);
     auto probArea = graphArea; 
 
-    // Draw subtle backgrounds
     g.setColour(juce::Colour::fromRGB(30, 30, 34));
     g.fillRect(audioArea);
     g.setColour(juce::Colour::fromRGB(25, 25, 28)); 
@@ -97,29 +95,17 @@ void VocalGateEditor::paint (juce::Graphics& g)
     inputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
     outputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
 
-    // --- INSTANT VISUAL SHIFT MATH ---
-    // 60 frames per 1000ms means 0.06 frames per ms
-    float shiftMs = static_cast<float>(shiftSlider.getValue());
-    int offsetFrames = juce::roundToInt(shiftMs * 0.06f); 
-
+    // Look how simple this loop is now! Just a 1:1 mapping.
     for (int i = 0; i < historySize; ++i)
     {
-        // 1. Audio Read Index (Normal circular buffer read)
-        size_t audioReadIndex = (writeIndex + static_cast<size_t>(i)) % historySize;
-        
-        // 2. Prob Read Index (Clamped to prevent the wrap-around glitch!)
-        // Instead of letting it loop, we clamp 'i + offsetFrames' to stay within our history limits
-        size_t logicalProbIndex = static_cast<size_t>(juce::jlimit(0, static_cast<int>(historySize) - 1, i + offsetFrames));
-        size_t probReadIndex = (writeIndex + logicalProbIndex) % historySize;
+        // One single read index for everything
+        size_t readIndex = (writeIndex + static_cast<size_t>(i)) % historySize;
 
         float x = audioArea.getX() + (i * xStep);
         
-        // Map audio to the top area
-        float inY = audioArea.getBottom() - (inputHistory[audioReadIndex] * audioArea.getHeight());
-        float outY = audioArea.getBottom() - (outputHistory[audioReadIndex] * audioArea.getHeight());
-
-        // Map probability to the bottom area using the CLAMPED shifted index
-        float pY = probArea.getBottom() - (probHistory[probReadIndex] * probArea.getHeight());
+        float inY = audioArea.getBottom() - (inputHistory[readIndex] * audioArea.getHeight());
+        float outY = audioArea.getBottom() - (outputHistory[readIndex] * audioArea.getHeight());
+        float pY = probArea.getBottom() - (probHistory[readIndex] * probArea.getHeight());
 
         inputPath.lineTo(x, inY);
         outputPath.lineTo(x, outY);
@@ -128,24 +114,20 @@ void VocalGateEditor::paint (juce::Graphics& g)
         else        probPath.lineTo(x, pY);
     }
 
-    // Close the audio paths
     inputPath.lineTo(audioArea.getRight(), audioArea.getBottom());
     inputPath.closeSubPath();
     outputPath.lineTo(audioArea.getRight(), audioArea.getBottom());
     outputPath.closeSubPath();
 
-    // --- 1. Draw Audio Silhouettes ---
     g.setColour(juce::Colour::fromRGB(80, 85, 95).withAlpha(0.4f));
     g.fillPath(inputPath);
 
     g.setColour(juce::Colour::fromRGB(40, 210, 180).withAlpha(0.85f));
     g.fillPath(outputPath);
 
-    // --- 2. Draw Probability Curve ---
     g.setColour (juce::Colours::darkorange);
     g.strokePath (probPath, juce::PathStrokeType(2.0f));
 
-    // --- 3. Draw Threshold Line ---
     float threshVal = static_cast<float>(thresholdSlider.getValue());
     float threshY = probArea.getBottom() - (threshVal * probArea.getHeight());
     
