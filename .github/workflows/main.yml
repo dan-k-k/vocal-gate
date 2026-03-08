@@ -60,3 +60,50 @@ jobs:
       # NO MORE DYLD_LIBRARY_PATH! The tests are entirely self-sufficient now.
       run: ctest --test-dir build --output-on-failure
 
+  # Job 3: Integration Test (Plugin Validation)
+  test-integration:
+    name: Plugin Validation (macOS)
+    runs-on: macos-14
+    
+    steps:
+    - name: Checkout Code with Submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive 
+
+    # --- IMPORTANT DEPENDENCY STEP ---
+    # If your libonnxruntime.dylib is NOT committed to your repo, 
+    # you MUST add your "Option A" fetch step here to download it!
+    # Otherwise, the macOS linker will fail to bundle it.
+    
+    - name: Provide ONNX Model
+      run: |
+        mkdir -p plugin 
+        # Since your C++ has a try/catch block around the ONNX load, 
+        # a dummy file will allow the plugin to open without crashing the DAW. 
+        # This perfectly tests the dynamic linking (dyld) without needing 
+        # to upload a massive ML model to GitHub Actions!
+        touch plugin/vocalgate_int8.onnx
+
+    - name: Configure CMake
+      run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build VST3 Plugin
+      # Notice we are building the actual plugin target now, not RunCPPTests
+      run: cmake --build build --target VocalGate_VST3 --parallel 4 
+
+    - name: Download and Setup pluginval
+      run: |
+        # Download the official pluginval macOS binary
+        curl -L "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip" -o pluginval.zip
+        unzip pluginval.zip
+
+    - name: Run pluginval Integration Test
+      run: |
+        # Because your CMakeLists.txt automatically copies the finished VST3 
+        # into the user's Library folder, we can test it directly from there!
+        
+        ./pluginval.app/Contents/MacOS/pluginval \
+          --strictness-level 5 \
+          --validate-in-process \
+          --validate "$HOME/Library/Audio/Plug-Ins/VST3/Vocal Gate.vst3"
