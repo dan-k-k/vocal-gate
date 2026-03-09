@@ -1,4 +1,6 @@
 # plugin/CMakeLists.txt
+# cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+# cmake --build builds/macOS --config Release --parallel 4
 cmake_minimum_required(VERSION 3.15)
 project(VocalGate VERSION 1.0.0)
 
@@ -43,6 +45,11 @@ target_sources(VocalGate
         Source/DSPConstants.h
 )
 
+target_include_directories(VocalGate
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/include
+)
+
 # Standard JUCE definitions
 target_compile_definitions(VocalGate
     PUBLIC
@@ -51,44 +58,73 @@ target_compile_definitions(VocalGate
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-# Link with ONNX 
+# 1. Base JUCE linking (DO NOT DELETE THIS)
 target_link_libraries(VocalGate
     PRIVATE
         VocalGateData 
         juce::juce_audio_utils
         juce::juce_dsp
-        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
 
-target_include_directories(VocalGate SYSTEM PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/include
-)
+# 2. OS-Specific Linking & Bundling
+if(APPLE)
+    # MAC SETUP
+    target_link_libraries(VocalGate PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib
+    )
 
-# VST to look for dylibs inside Frameworks folder
-set_target_properties(VocalGate_VST3 PROPERTIES
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH "@loader_path/../Frameworks"
-)
+    set(PLUGIN_FORMATS VST3 AU Standalone)
 
-# Construction
-add_custom_command(TARGET VocalGate_VST3 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:VocalGate_VST3>/../Frameworks"
-    
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib"
-        "$<TARGET_FILE_DIR:VocalGate_VST3>/../Frameworks/libonnxruntime.1.24.2.dylib"
-        
-    COMMAND xattr -rc "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
-    COMMAND codesign --force --deep --sign - "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
-    COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Vocal Gate.vst3"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
-        "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Vocal Gate.vst3"
-)
+    foreach(FORMAT IN LISTS PLUGIN_FORMATS)
+        set(TARGET_NAME "VocalGate_${FORMAT}")
+
+        set_target_properties(${TARGET_NAME} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "@loader_path/../Frameworks"
+        )
+
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+            # Create Frameworks folder
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks"
+            
+            # Copy ONNX
+            COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib"
+                "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.dylib"
+            
+            # Sign the dylib, then sign the bundle
+            COMMAND codesign --force --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.dylib"
+            COMMAND codesign --force --deep --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../.."
+        )
+    endforeach()
+
+    # Optional: Auto-copy VST3 to your local Mac plugins folder for testing
+    add_custom_command(TARGET VocalGate_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
+            "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Vocal Gate.vst3"
+    )
+
+elseif(WIN32)
+    # WINDOWS SETUP (Ready for later)
+    target_link_libraries(VocalGate PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.lib
+    )
+
+    add_custom_command(TARGET VocalGate_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.dll"
+            "$<TARGET_FILE_DIR:VocalGate_VST3>/"
+            
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
+            "$ENV{COMMONPROGRAMFILES}/VST3/Vocal Gate.vst3"
+    )
+endif()
 
 # CTest
 enable_testing()
