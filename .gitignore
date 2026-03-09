@@ -35,6 +35,7 @@ ml_pipeline/render_final_video.py
 # C++ / JUCE Plugin
 plugin/build/
 build/
+builds/
 
 # Compiled Binaries
 *.vst3

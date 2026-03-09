@@ -394,6 +394,7 @@ void VocalGateProcessor::runONNXModel()
         logMelFeatures.data(), 
         logMelFeatures.size(), 
         inputShape, 
+        4
     );
 
     // Output tensor wrapper pointing to the pre-allocated array
@@ -402,6 +403,7 @@ void VocalGateProcessor::runONNXModel()
         outputLogitData.data(),
         outputLogitData.size(),
         outputShape,
+        2
     );
 
     const char* inputNames[] = {"input_log_mel"};

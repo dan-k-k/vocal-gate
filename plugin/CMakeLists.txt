@@ -1,4 +1,6 @@
 # plugin/CMakeLists.txt
+# cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64"
+# cmake --build builds/macOS --config Release --parallel 4
 cmake_minimum_required(VERSION 3.15)
 project(VocalGate VERSION 1.0.0)
 
@@ -57,7 +59,7 @@ target_link_libraries(VocalGate
         VocalGateData 
         juce::juce_audio_utils
         juce::juce_dsp
-        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib
+        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -79,7 +81,7 @@ add_custom_command(TARGET VocalGate_VST3 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:VocalGate_VST3>/../Frameworks"
     
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib"
+        "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib"
         "$<TARGET_FILE_DIR:VocalGate_VST3>/../Frameworks/libonnxruntime.1.24.2.dylib"
         
     COMMAND xattr -rc "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
