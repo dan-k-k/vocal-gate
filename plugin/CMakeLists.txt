@@ -74,7 +74,7 @@ target_link_libraries(VocalGate
 if(APPLE)
     # MAC SETUP
     target_link_libraries(VocalGate PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib
+        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib
     )
 
     set(PLUGIN_FORMATS VST3 AU Standalone)
@@ -93,11 +93,11 @@ if(APPLE)
             
             # Copy ONNX
             COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.dylib"
-                "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.dylib"
+                "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib"
+                "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.1.24.2.dylib"
             
             # Sign the dylib, then sign the bundle
-            COMMAND codesign --force --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.dylib"
+            COMMAND codesign --force --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.1.24.2.dylib"
             COMMAND codesign --force --deep --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../.."
         )
     endforeach()
