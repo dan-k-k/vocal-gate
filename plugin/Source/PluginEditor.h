@@ -5,7 +5,6 @@
 #include "PluginProcessor.h"
 #include <array>
 
-// --- 1. Define the Custom LookAndFeel ---
 class CustomKnobLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
@@ -21,21 +20,16 @@ public:
         auto rw = radius * 2.0f;
         auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
-        // Draw Knob Body (Dark Grey)
+        // Knob
         g.setColour (juce::Colour::fromRGB (45, 45, 50));
         g.fillEllipse (rx, ry, rw, rw);
-
-        // Draw Knob Outline (Matches background to give separation)
         g.setColour (juce::Colour::fromRGB (20, 20, 22));
         g.drawEllipse (rx, ry, rw, rw, 2.0f);
 
-        // Draw the Pointer
-        // We use the slider's 'thumbColourId' to dynamically set the pointer color!
+        // Pointer
         juce::Path p;
         auto pointerLength = radius * 0.75f;
         auto pointerThickness = 4.0f;
-        
-        // Draw a line pointing straight up, then rotate it
         p.addRoundedRectangle (-pointerThickness * 0.5f, -radius + 4.0f, pointerThickness, pointerLength, 2.0f);
         p.applyTransform (juce::AffineTransform::rotation (angle).translated (centreX, centreY));
 
@@ -56,9 +50,9 @@ public:
 
 private:
     VocalGateProcessor& audioProcessor;
-
-    // --- 2. Add the custom LookAndFeel instance ---
     CustomKnobLookAndFeel customKnobLookAndFeel;
+    
+    juce::Font titleFont; 
 
     juce::Slider thresholdSlider;
     juce::Label thresholdLabel;

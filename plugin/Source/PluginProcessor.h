@@ -4,7 +4,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <onnxruntime_cxx_api.h>
 #include "AudioFIFO.h"
-#include <mutex> // Add this at the top of your header
+#include <mutex> 
 
 class VocalGateProcessor : public juce::AudioProcessor, public juce::Thread
 {
@@ -16,8 +16,7 @@ public:
     void releaseResources() override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
-    // --- Threading ---
-    void run() override; // This is the Background ML Thread
+    void run() override; // Background ML thread
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -40,40 +39,37 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    // The Processor updates this, the Editor reads it for the visualizer
-    std::atomic<float> inputLevel { 0.0f };
+    std::atomic<float> inputLevel { 0.0f }; // Processor updates, editor reads
     std::atomic<float> outputLevel { 0.0f };
     std::atomic<float> gateProbability { 0.0f }; 
 
 private:
-    // --- Neural Network Constants ---
+    // NN constants
     static constexpr int targetSampleRate = 16000;
     static constexpr int modelInputSamples = 16000; // 1 second of audio
     static constexpr int hopSizeSamples = 4000;     // 250ms evaluation hop
 
-    // --- Buffering & Threading ---
+    // Buffering, threading
     std::unique_ptr<AudioFIFO> audioFifo;
     float pushAndAveragePrediction(float rawProb);
     static constexpr int maxPredictionFrames = 32; // > 24 frames needed for 1200ms
     std::array<float, maxPredictionFrames> predictionHistory { 0.0f };
     int predictionWriteIndex = 0;
         
-    // Smooths the gate movement in the audio thread (Attack/Release)
     float currentGainEnvelope = 1.0f;       
 
-    // --- Resampling ---
-    // DAW might run at 44.1k or 48k, but ONNX *needs* 16k.
+    // Resampling
     double dawSampleRate = 44100.0;
 
-    // --- DSP & ML Helpers ---
+    // DSP, ML helpers
     void computeLogMels(const std::vector<float>& audio16k);
     void runONNXModel();
 
-    // --- ONNX Runtime ---
+    // ONNX runtime
     Ort::Env onnxEnv{ORT_LOGGING_LEVEL_WARNING, "VocalGate"};
     std::unique_ptr<Ort::Session> onnxSession;
     
-    // --- Plugin Memory ---
+    // Plugin memory
     Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -84,21 +80,17 @@ private:
     std::atomic<float>* shiftParam     = nullptr;
     std::atomic<float>* probSmoothingParam = nullptr;
 
-    // --- Delay / Lookahead ---
+    // Delay / lookahead
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 96000 };
     int lookaheadSamples = 0;
-
-    // Add these under your private variables:
     int probBufferSize = 0;
     std::unique_ptr<std::atomic<float>[]> probRingBuffer;
 
-    // Tracks the exact absolute sample we are currently feeding into the ML model
-    uint64_t mlWriteIndex = 0; 
+    uint64_t mlWriteIndex = 0; // Exact sample being fed to ML
 
-    // Tracks the exact absolute sample we are currently processing in the audio thread
-    std::atomic<uint64_t> audioReadIndex { 0 }; 
+    std::atomic<uint64_t> audioReadIndex { 0 }; // Exact sample being processed in audio thread
 
-    //// --- Pre-allocated Memory (Avoids Heap Thrashing) ---
+    // Pre-allocated memory
     std::vector<float> dawHopBuffer;
     std::vector<float> resampledHopBuffer;
     std::vector<float> rolling16kBuffer;
@@ -108,20 +100,20 @@ private:
     std::vector<float> powerSpec;
     std::vector<float> melEnergies;
 
-    // ADD THESE: Pre-allocated output buffer and static tensor shapes
+    // Pre-allocated output and tensor shapes
     std::array<float, 1> outputLogitData { 0.0f }; 
     static constexpr int64_t inputShape[] = {1, 1, 40, 61};
-    static constexpr int64_t outputShape[] = {1, 1}; // Note: Change to {1} if your model expects a 1D tensor
+    static constexpr int64_t outputShape[] = {1, 1}; 
 
-    // Move FFT and Resampler here so they only initialize once
+    // FFT and resampler
     juce::dsp::FFT forwardFFT { 9 }; 
     juce::LagrangeInterpolator resampler;
 
-    // --- Thread Synchronization ---
+    // Thread sync
     std::atomic<bool> mlDataReady { false };
     int dawSamplesPerHop = 0;
 
-    // --- Offline Buffer ---
+    // Offline buffer
     void processMLHop(const float* hopData);
     std::mutex mlMutex; 
     std::vector<float> offlineHopBuffer;

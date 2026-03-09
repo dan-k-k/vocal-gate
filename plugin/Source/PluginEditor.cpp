@@ -1,13 +1,17 @@
 // plugin/Source/PluginEditor.cpp
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <BinaryData.h> 
 
 VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     setSize (600, 300); 
 
-    // Updated lambda: takes a const juce::String& paramID instead of an atomic pointer
+    auto typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::FredokaOne_ttf, BinaryData::FredokaOne_ttfSize);
+    titleFont = juce::Font (typeface);
+    titleFont.setHeight (28.0f); 
+
     auto setupKnob = [this](juce::Slider& slider, juce::Label& label, const juce::String& text, 
                             const juce::String& suffix, const juce::String& paramID, 
                             std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attachment,
@@ -17,14 +21,13 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
         slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 120, 20);
         slider.setTextValueSuffix(suffix);
         
-        // Apply our custom LookAndFeel and color
         slider.setLookAndFeel(&customKnobLookAndFeel);
         slider.setColour(juce::Slider::thumbColourId, pointerColor);
         slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
 
         addAndMakeVisible(slider);
         
-        // Use the APVTS attachment, passing the APVTS, the parameter ID string, and the slider
+        // APVTS attachment
         attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
             audioProcessor.apvts, paramID, slider);
 
@@ -35,28 +38,26 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
         addAndMakeVisible(label);
     };
 
-    // --- Define your theme colors ---
     juce::Colour detectionColor = juce::Colours::darkorange;
     juce::Colour envelopeColor = juce::Colour::fromRGB(40, 210, 180);
 
-    // --- Apply them to the knobs using the Parameter IDs string ---
     setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", "threshold", thresholdAttachment, detectionColor);
     setupKnob(floorSlider, floorLabel, "Floor", " dB", "floor", floorAttachment, detectionColor);
     setupKnob(probSmoothSlider, probSmoothLabel, "P Smooth", " ms", "probsmoothing", probSmoothAttachment, detectionColor);
+    setupKnob(shiftSlider, shiftLabel, "Shift", " ms", "shift", shiftAttachment, detectionColor);
 
     setupKnob(attackSlider, attackLabel, "Attack", " ms", "attack", attackAttachment, envelopeColor);
     setupKnob(releaseSlider, releaseLabel, "Release", " ms", "release", releaseAttachment, envelopeColor);
-    setupKnob(shiftSlider, shiftLabel, "Shift", " ms", "shift", shiftAttachment, envelopeColor);
 
     startTimerHz(60); 
 }
 
 VocalGateEditor::~VocalGateEditor() 
 {
-    // CRITICAL: You must remove the custom LookAndFeel before the editor is destroyed
+    // Remove before the plugin is destroyed
     thresholdSlider.setLookAndFeel(nullptr);
     floorSlider.setLookAndFeel(nullptr);
-    probSmoothSlider.setLookAndFeel(nullptr); // <--- ADD THIS
+    probSmoothSlider.setLookAndFeel(nullptr); 
     attackSlider.setLookAndFeel(nullptr);
     releaseSlider.setLookAndFeel(nullptr);
     shiftSlider.setLookAndFeel(nullptr);
@@ -64,11 +65,18 @@ VocalGateEditor::~VocalGateEditor()
 
 void VocalGateEditor::timerCallback()
 {
-    // Read all three values
+    // Raw audio levels
     inputHistory[writeIndex]  = audioProcessor.inputLevel.load();
     outputHistory[writeIndex] = audioProcessor.outputLevel.load();
-    probHistory[writeIndex]   = audioProcessor.gateProbability.load(); // Read the ML brain
 
+    float rawProb = audioProcessor.gateProbability.load(); // Smoothed
+    
+    size_t prevIndex = (writeIndex + historySize - 1) % historySize;
+    float prevProb = probHistory[prevIndex];
+    
+    // 0.0f = responsive but choppy, 1.0f = smooth but slow
+    float smoothAmount = 0.6f; 
+    probHistory[writeIndex] = (rawProb * (1.0f - smoothAmount)) + (prevProb * smoothAmount);
     writeIndex = (writeIndex + 1) % historySize;
     repaint(); 
 }
@@ -95,17 +103,21 @@ void VocalGateEditor::paint (juce::Graphics& g)
     inputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
     outputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
 
-    // Look how simple this loop is now! Just a 1:1 mapping.
+    // Visual shift
+    float shiftMs = static_cast<float>(shiftSlider.getValue());
+    int shiftFrames = static_cast<int>(std::round(shiftMs / (1000.0f / 60.0f)));
+
     for (int i = 0; i < historySize; ++i)
     {
-        // One single read index for everything
-        size_t readIndex = (writeIndex + static_cast<size_t>(i)) % historySize;
+        size_t audioReadIndex = (writeIndex + static_cast<size_t>(i)) % historySize;
+        int source_i = i - shiftFrames; 
+        source_i = juce::jlimit(0, historySize - 1, source_i); 
+        size_t probReadIndex = (writeIndex + static_cast<size_t>(source_i)) % historySize;
 
         float x = audioArea.getX() + (i * xStep);
-        
-        float inY = audioArea.getBottom() - (inputHistory[readIndex] * audioArea.getHeight());
-        float outY = audioArea.getBottom() - (outputHistory[readIndex] * audioArea.getHeight());
-        float pY = probArea.getBottom() - (probHistory[readIndex] * probArea.getHeight());
+        float inY = audioArea.getBottom() - (inputHistory[audioReadIndex] * audioArea.getHeight());
+        float outY = audioArea.getBottom() - (outputHistory[audioReadIndex] * audioArea.getHeight());
+        float pY = probArea.getBottom() - (probHistory[probReadIndex] * probArea.getHeight());
 
         inputPath.lineTo(x, inY);
         outputPath.lineTo(x, outY);
@@ -119,42 +131,46 @@ void VocalGateEditor::paint (juce::Graphics& g)
     outputPath.lineTo(audioArea.getRight(), audioArea.getBottom());
     outputPath.closeSubPath();
 
+    // Input and output waveforms
     g.setColour(juce::Colour::fromRGB(80, 85, 95).withAlpha(0.4f));
     g.fillPath(inputPath);
-
     g.setColour(juce::Colour::fromRGB(40, 210, 180).withAlpha(0.85f));
     g.fillPath(outputPath);
 
+    // Prob and threshold
     g.setColour (juce::Colours::darkorange);
     g.strokePath (probPath, juce::PathStrokeType(2.0f));
-
     float threshVal = static_cast<float>(thresholdSlider.getValue());
     float threshY = probArea.getBottom() - (threshVal * probArea.getHeight());
-    
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     float dashLengths[2] = { 4.0f, 4.0f };
     g.drawDashedLine(juce::Line<float>(probArea.getX(), threshY, probArea.getRight(), threshY), dashLengths, 2, 1.0f);
+
+    // Logo
+    g.setColour (juce::Colour::fromRGB (120, 125, 135)); 
+    g.setFont (titleFont); 
+    g.drawText ("Vocal Gate", audioArea.getX() + 8, audioArea.getY() + 8, 150, 40, juce::Justification::topLeft, true);
 }
 
 void VocalGateEditor::resized()
 {
     auto bounds = getLocalBounds();
-    auto bottomArea = bounds.removeFromBottom(110); // Area for knobs
+    auto bottomArea = bounds.removeFromBottom(110); 
     
     int squeezePixels = 40; 
     bottomArea = bottomArea.withTrimmedLeft(squeezePixels).withTrimmedRight(squeezePixels);
     
-    // CHANGE THIS: Divide by 6 columns instead of 5
     int knobWidth = bottomArea.getWidth() / 6; 
     int shiftDown = 8;
 
-    // Lay them out sequentially from left to right
+    // Det
     thresholdSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     floorSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     probSmoothSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
+    shiftSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     
+    // Env
     attackSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     releaseSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
-    shiftSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
 }
 

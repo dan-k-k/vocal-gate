@@ -1,10 +1,10 @@
 // plugin/Source/PluginProcessor.cpp
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "DSPConstants.h" // <--- ADD THIS
-#include <cstring>   // For std::memset, std::memcpy, std::memmove
-#include <cmath>     // For std::log10, std::exp
-#include <algorithm> // For std::max
+#include "DSPConstants.h"
+#include <cstring>
+#include <cmath>
+#include <algorithm>
 #include <BinaryData.h>
 
 juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createParameterLayout()
@@ -13,7 +13,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createPa
 
     // 1. Threshold
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"threshold", 1}, "Threshold", 0.001f, 0.999f, 0.70f));
+        juce::ParameterID{"threshold", 1}, "P Threshold", 0.001f, 0.999f, 0.60f));
 
     // 2. Floor
     juce::NormalisableRange<float> floorRange (-100.0f, 0.0f, 0.1f);
@@ -39,8 +39,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createPa
         juce::ParameterID{"release", 1}, "Release", releaseRange, 150.0f));
 
     // 5. Shift
-    juce::NormalisableRange<float> shiftRange (-100.0f, 200.0f, 0.1f);
-    shiftRange.setSkewForCentre (0.0f);
+    juce::NormalisableRange<float> shiftRange (-200.0f, 200.0f, 0.1f);
+    
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"shift", 1}, "Shift", shiftRange, 0.0f));
 
@@ -67,7 +67,7 @@ VocalGateProcessor::VocalGateProcessor()
        apvts(*this, nullptr, "Parameters", createParameterLayout()) 
 #endif
 {
-    // Grab the atomic pointers so the audio thread can read them instantly without locking
+    // Atomic pointers
     thresholdParam     = apvts.getRawParameterValue("threshold");
     floorParam         = apvts.getRawParameterValue("floor");
     attackParam        = apvts.getRawParameterValue("attack");
@@ -80,7 +80,6 @@ VocalGateProcessor::VocalGateProcessor()
     sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
     try {
-        // Load directly from the baked-in BinaryData memory
         onnxSession = std::make_unique<Ort::Session>(
             onnxEnv, 
             BinaryData::vocalgate_int8_onnx, 
@@ -100,17 +99,15 @@ VocalGateProcessor::VocalGateProcessor()
     catch (const Ort::Exception& e) {
         juce::Logger::writeToLog("🚨 ONNX LOAD CRASH: " + juce::String(e.what()));
     }
-} // <--- The constructor now ends cleanly right after the catch block
+}
 
 VocalGateProcessor::~VocalGateProcessor()
 {
-    // Crucial: Stop the thread safely before the plugin is destroyed
     stopThread (4000); 
 }
 
 void VocalGateProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // APVTS handles the XML mapping automatically
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     copyXmlToBinary (*xml, destData);
@@ -141,13 +138,11 @@ float VocalGateProcessor::pushAndAveragePrediction(float rawProb)
         sum += predictionHistory[readIndex];
     }
             
-    // RETURN the value instead of storing it in the atomic!
     return sum / static_cast<float>(framesToKeep); 
 }
 
 void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Stop the thread if it's already running from a previous prepareToPlay call
     if (isThreadRunning())
         stopThread(2000); 
 
@@ -155,42 +150,40 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     audioFifo = std::make_unique<AudioFIFO> (static_cast<int>(dawSampleRate * 2.0));
     currentGainEnvelope = 1.0f;
 
-    // --- Setup Lookahead Latency ---
-    double lookaheadSeconds = 0.550;
+    // Default lookahead latency
+    double lookaheadSeconds = 0.750; 
     
     lookaheadSamples = static_cast<int>(sampleRate * lookaheadSeconds); 
     
-    // Tell Ableton to delay all other tracks by 550ms
-    setLatencySamples(lookaheadSamples); 
+    // Tell Ableton to delay
+    setLatencySamples(lookaheadSamples);
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = samplesPerBlock;
     spec.numChannels = getTotalNumOutputChannels();
     
-    // 1. Setup the Probability Ring Buffer (2 seconds of safety)
+    // Prob ring buffer
     probBufferSize = static_cast<int>(sampleRate * 2.0);
     probRingBuffer = std::make_unique<std::atomic<float>[]>(probBufferSize);
     for (int i = 0; i < probBufferSize; ++i) {
         probRingBuffer[i].store(0.0f, std::memory_order_relaxed);
     }
 
-    // Reset timelines
     mlWriteIndex = 0;
     audioReadIndex.store(0);
 
-    // 2. LOCK the audio delay line. No more smoothedDelay!
     delayLine.setMaximumDelayInSamples(static_cast<int>(sampleRate * 2.0));
     delayLine.prepare(spec);
-    delayLine.setDelay(lookaheadSamples); // This never changes now.
+    delayLine.setDelay(lookaheadSamples); // This never changes
     
     resampler.reset();
 
-    // --- Pre-allocate ML Thread Memory ---
+    // ML thread memory 
     dawSamplesPerHop = static_cast<int>(sampleRate * 0.05);
     
     dawHopBuffer.assign(dawSamplesPerHop, 0.0f);
-    offlineHopBuffer.assign(dawSamplesPerHop, 0.0f); // <--- ADD THIS
+    offlineHopBuffer.assign(dawSamplesPerHop, 0.0f);
     resampledHopBuffer.assign(800, 0.0f);
     rolling16kBuffer.assign(16000, 0.0f);
 
@@ -207,10 +200,7 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void VocalGateProcessor::releaseResources()
 {
-    // Safely stop the background ML thread
     stopThread(4000);
-    
-    // Free up memory when Ableton stops the transport
     audioFifo.reset();
 }
 
@@ -220,15 +210,12 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     int numSamples = buffer.getNumSamples();
     const float* leftChannelIn = buffer.getReadPointer(0);
 
-    // --- 1. HANDLE AUDIO FIFO & ML ROUTING ---
     if (isNonRealtime()) 
     {
-        // OFFLINE RENDER: Force the audio thread to wait for the ML model synchronously
+        // Offline rendering
         if (audioFifo != nullptr) 
         {
             audioFifo->push(leftChannelIn, numSamples);
-            
-            // Loop through all available complete hops and process immediately
             while (audioFifo->getNumReady() >= dawSamplesPerHop) 
             {
                 audioFifo->pop(offlineHopBuffer.data(), dawSamplesPerHop);
@@ -238,13 +225,12 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     }
     else 
     {
-        // REALTIME PLAYBACK: Delegate to background thread
+        // Realtime: background thread
         if (audioFifo != nullptr && audioFifo->getFreeSpace() >= numSamples)
         {
             audioFifo->push (leftChannelIn, numSamples);
             if (audioFifo->getNumReady() >= dawSamplesPerHop)
             {
-                // Safely set the flag to true without blocking the audio thread
                 mlDataReady.store(true, std::memory_order_release); 
             }
         }
@@ -260,8 +246,8 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     float duckingGain = (currentFloorDB <= -99.9f) ? 0.0f : juce::Decibels::decibelsToGain(currentFloorDB);
 
-    // Calculate shift in samples
-    int halfWindowSamples = static_cast<int>(dawSampleRate * 0.5); // 500ms offset
+    // Shift in samples
+    int halfWindowSamples = static_cast<int>(dawSampleRate * 0.55); // Allows time to look ahead
     float shiftMs = shiftParam->load();
     int shiftSamples = static_cast<int>(shiftMs * (dawSampleRate / 1000.0f));
 
@@ -275,7 +261,7 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     for (int i = 0; i < numSamples; ++i)
     {
-        // 1. Process Fixed Audio Delay
+        // Process fixed audio delay
         float inL = buffer.getSample(0, i);
         float delayedL = delayLine.popSample(0);
         delayLine.pushSample(0, inL);
@@ -288,15 +274,15 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
             outR[i] = delayedR;
         }
 
-        // 2. Read the Synchronized Probability
-        int64_t syncedIndex = localReadIndex - lookaheadSamples + halfWindowSamples + shiftSamples;
+        // Read the synchronised prob
+        int64_t syncedIndex = localReadIndex - lookaheadSamples + halfWindowSamples - dawSamplesPerHop - shiftSamples;
         int readPos = static_cast<int>(syncedIndex % probBufferSize); 
         if (readPos < 0) { readPos += probBufferSize; }
 
         float currentProb = probRingBuffer[readPos].load(std::memory_order_relaxed);
         gateProbability.store(currentProb, std::memory_order_relaxed);
 
-        // 3. Apply the Gate Envelope (FLIPPED LOGIC HERE!)
+        // Apply gate env
         float targetGain = (currentProb < currentThreshold) ? 1.0f : duckingGain;
 
         if (targetGain < currentGainEnvelope) {
@@ -316,8 +302,7 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     audioReadIndex.store(localReadIndex, std::memory_order_relaxed);
 
-    // --- 6. STORE PEAKS ---
-    inputLevel.store(currentInPeak);  // <--- ADD THIS BACK
+    inputLevel.store(currentInPeak);  
     outputLevel.store(currentOutPeak);
 }
 
@@ -331,12 +316,10 @@ void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)
     
     for (size_t frame = 0; frame < num_frames; ++frame)
     {
-        // Safely exit if the user deletes the plugin!
         if (threadShouldExit()) return; 
 
         size_t start_sample = frame * hop_length;
 
-        // Zero out the pre-allocated timeDomain buffer
         std::fill(timeDomain.begin(), timeDomain.end(), 0.0f);
 
         for (size_t i = 0; i < n_fft; ++i) {
@@ -345,12 +328,10 @@ void VocalGateProcessor::computeLogMels(const std::vector<float>& audio16k)
 
         forwardFFT.performFrequencyOnlyForwardTransform(timeDomain.data());
         
-        // Overwrite the pre-allocated powerSpec buffer
         for (size_t i = 0; i < num_freq_bins; ++i) {
             powerSpec[i] = timeDomain[i] * timeDomain[i];
         }
 
-        // Overwrite the pre-allocated melEnergies buffer
         for (size_t m = 0; m < num_mels; ++m) 
         {
             float sum = 0.0f;
@@ -375,10 +356,8 @@ void VocalGateProcessor::processMLHop(const float* hopData)
 
     if (peakLevel < silenceThreshold) 
     {
-        // Get the smoothed 0.0 probability
         float smoothedProb = pushAndAveragePrediction(0.0f);
         
-        // Write it into the timeline just like the real model does
         for (int i = 0; i < dawSamplesPerHop; ++i) 
         {
             int writePos = (mlWriteIndex + i) % probBufferSize;
@@ -409,77 +388,65 @@ void VocalGateProcessor::processMLHop(const float* hopData)
 
 void VocalGateProcessor::runONNXModel()
 {
-    // 1. Create the input tensor wrapper
+    // Input tensor wrapper
     Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
         memoryInfo, 
         logMelFeatures.data(), 
         logMelFeatures.size(), 
         inputShape, 
-        4 // size of inputShape array
     );
 
-    // 2. Create the output tensor wrapper pointing to our pre-allocated array!
+    // Output tensor wrapper pointing to the pre-allocated array
     Ort::Value outputTensor = Ort::Value::CreateTensor<float>(
         memoryInfo,
         outputLogitData.data(),
         outputLogitData.size(),
         outputShape,
-        2 // size of outputShape array (change to 1 if shape is {1})
     );
 
     const char* inputNames[] = {"input_log_mel"};
     const char* outputNames[] = {"gate_logit"};
 
-    // 3. Run the Model (Zero allocations happen here now)
+    // Run model 
     onnxSession->Run(
         Ort::RunOptions{nullptr}, 
         inputNames, 
         &inputTensor, 
         1, 
         outputNames, 
-        &outputTensor, // Pass the pre-allocated tensor here
+        &outputTensor,
         1
     );
 
-    // 4. Extract the Logit and Apply Sigmoid
     float rawProb = 1.0f / (1.0f + std::exp(-outputLogitData[0]));
-
-    // Get the smoothed probability using the function we just fixed
     float finalProb = pushAndAveragePrediction(rawProb); 
 
-    // Write this probability across the entire chunk of samples it represents
     for (int i = 0; i < dawSamplesPerHop; ++i) 
     {
         int writePos = (mlWriteIndex + i) % probBufferSize;
         probRingBuffer[writePos].store(finalProb, std::memory_order_relaxed);
     }
-
-    // Advance the ML write index by exactly one hop size
     mlWriteIndex += dawSamplesPerHop;
 }
 
-// --- The Background ML Thread ---
+// Background ML thread
 void VocalGateProcessor::run()
 {    
     while (! threadShouldExit())
     {
-        // 1. Check if the audio thread told us data is ready, OR if the FIFO just has enough data
+        // Check if the audio thread told us data is ready OR if the FIFO just has enough data
         if (mlDataReady.load(std::memory_order_acquire) || 
            (!isNonRealtime() && audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop))
         {
-            // 2. Process ALL available hops in case we fell slightly behind
             while (audioFifo != nullptr && audioFifo->getNumReady() >= dawSamplesPerHop && !threadShouldExit())
             {
                 audioFifo->pop(dawHopBuffer.data(), dawSamplesPerHop);
                 processMLHop(dawHopBuffer.data());
             }
-            
-            // 3. Reset the flag
             mlDataReady.store(false, std::memory_order_release);
         }
         else
         {
-            // 4. Sleep for 5ms to save CPU power while waiting for the audio thread
             juce::Thread::sleep(5); 
         }
     }
@@ -487,11 +454,10 @@ void VocalGateProcessor::run()
 
 juce::AudioProcessorEditor* VocalGateProcessor::createEditor()
 {
-    // Assuming your custom editor class is named VocalGateEditor
     return new VocalGateEditor (*this); 
 }
 
-// This creates new instances of the plugin..
+// Create plugin instance
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new VocalGateProcessor();

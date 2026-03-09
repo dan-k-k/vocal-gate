@@ -51,3 +51,4 @@ plugin/onnxruntime/lib/*
 *.mp4
 *.mov
 temp_*
+*.m4a

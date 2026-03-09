@@ -6,13 +6,13 @@
 class AudioFIFO
 {
 public:
-    // Initialize the FIFO with a specific capacity
+    // Init fifo with specific cap
     AudioFIFO(int capacity) : abstractFifo(capacity), buffer(1, capacity)
     {
         buffer.clear();
     }
 
-    // Called by the Audio Thread (Fast/Real-Time)
+    // Called by the audio thread (fast)
     void push(const float* data, int numSamples)
     {
         int start1, size1, start2, size2;
@@ -24,7 +24,7 @@ public:
         abstractFifo.finishedWrite(size1 + size2);
     }
 
-    // Called by the Background Thread (Slow/ML)
+    // Called by the background thread (ML)
     void pop(float* dest, int numSamples)
     {
         int start1, size1, start2, size2;
