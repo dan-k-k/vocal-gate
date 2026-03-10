@@ -20,14 +20,17 @@ jobs:
 
     # --- 1. PREPARE DEPENDENCIES ---
     - name: Download Windows ONNX Runtime
-      # You need the Windows .lib and .dll for the linker to work.
-      # If these aren't in your repo, you must download them here and put 
-      # them in plugin/onnxruntime/lib/ as your CMake expects.
+      shell: bash
       run: |
         mkdir -p plugin/onnxruntime/lib
-        # (Insert your script to download/unzip the Windows ONNX release here)
-        # touch plugin/onnxruntime/lib/onnxruntime.lib 
-        # touch plugin/onnxruntime/lib/onnxruntime.dll
+        
+        # 1. Download the EXACT version of ONNX Runtime you used on Mac (1.24.2), but the Windows x64 version!
+        curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-win-x64-1.24.2.zip" -o onnx_win.zip
+        unzip onnx_win.zip
+        
+        # 2. Copy the real Windows .lib and .dll into your CMake's expected folder
+        cp onnxruntime-win-x64-1.24.2/lib/onnxruntime.lib plugin/onnxruntime/lib/
+        cp onnxruntime-win-x64-1.24.2/lib/onnxruntime.dll plugin/onnxruntime/lib/
 
     # --- 2. COMPILE C++ ---
     - name: Configure CMake
@@ -53,4 +56,3 @@ jobs:
         # This is the output file your installer.iss will create
         path: Output/VocalGate_Windows_Installer.exe
 
-  
