@@ -2,11 +2,11 @@
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. Built for macOS (M-series).
 
-### See it in Action
-
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
 </p>
+
+### Real-World Use
 
 <p align="center">
   <a href="https://youtu.be/z2ef61ITh04">
