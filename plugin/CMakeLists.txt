@@ -1,9 +1,5 @@
 # plugin/CMakeLists.txt
-<<<<<<< HEAD
-# cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64"
-=======
 # cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
->>>>>>> gearuptorelease
 # cmake --build builds/macOS --config Release --parallel 4
 cmake_minimum_required(VERSION 3.15)
 project(VocalGate VERSION 1.0.0)

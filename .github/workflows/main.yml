@@ -107,3 +107,4 @@ jobs:
           --strictness-level 5 \
           --validate-in-process \
           --validate "$HOME/Library/Audio/Plug-Ins/VST3/Vocal Gate.vst3"
+

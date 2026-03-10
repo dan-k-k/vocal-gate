@@ -6,7 +6,7 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
 </p>
 
-### Real-World Use
+### Real-World Use Examples
 
 <p align="center">
   <a href="https://youtu.be/z2ef61ITh04">
