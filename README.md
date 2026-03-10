@@ -27,6 +27,6 @@
 </p>
 
 <p align="center">
-  <img src="images/LogMel_Plugin_Demo1.mp4" alt="LogMel_Plugin_Demo" width="500">
+  <video src="images/LogMel_Plugin_Demo1.mp4" width="500" autoplay loop muted playsinline></video>
 </p>
 
