@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://youtu.be/z2ef61ITh04">
-    <img src="images/DemoThumbnail1.png" alt="Vocal Gate Demo" width="500">
+    <img src="images/VocalGateThumbnail.png" alt="Vocal Gate Demo" width="500">
   </a>
 </p>
 
