@@ -21,7 +21,7 @@ IMAGES_DIR = "../images"
 MODELS_TO_TEST = {
     "Original": "./models/vocalgate_best.pt",
     "Pruned": "./models/vocalgate_pruned.pt",
-    "Quantized": "../plugin/vocalgate_int8.onnx" # <--- Update this path!
+    "P+Q": "../plugin/vocalgate_int8.onnx" # <--- Update this path!
 }
 threshold=0.5; print(f"Threshold={threshold}")
 
@@ -136,7 +136,7 @@ def main():
 
     # Setup the plot
     os.makedirs(IMAGES_DIR, exist_ok=True)
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(6, 4))
     
     colors = ['darkorange', 'dodgerblue', 'forestgreen'] # Added a 3rd color
 
@@ -157,13 +157,14 @@ def main():
             plt.plot(fpr, tpr, color=colors[i % len(colors)], lw=2, 
                      label=f'{model_name} (AUC = {roc_auc:.3f})')
 
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
+    plt.plot([0, 0.15], [0, 0.15], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 0.15])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate (Muting clean vocals)')
-    plt.ylabel('True Positive Rate (Muting actual coughs)')
-    plt.title('ROC Curve: Original vs Pruned Gate Performance')
-    plt.legend(loc="lower right")
+    plt.xlabel('FPR', fontsize=14)
+    plt.ylabel('TPR', fontsize=14)
+    plt.tick_params(axis='both', labelsize=12)
+    plt.title('Original, Pruned and Pruned+Quantised Gate Performance')
+    plt.legend(loc="lower right", fontsize=11)
     plt.grid(alpha=0.3)
 
     save_path = os.path.join(IMAGES_DIR, "roc_curve_comparison.png")

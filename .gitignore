@@ -49,7 +49,9 @@ plugin/onnxruntime/lib/*
 !plugin/onnxruntime/lib/libonnxruntime.dylib
 
 # Generated Media & Plots
+videos/
 *.mp4
+!images/LogMel_Plugin_Demo1.mp4
 *.mov
 temp_*
 *.m4a

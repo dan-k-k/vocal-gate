@@ -41,15 +41,15 @@ def plot_training_curve(csv_file="training_log.csv", output_img="loss_curve.png"
     plt.plot(epochs, train_losses, label='Train Loss', color='dodgerblue', linewidth=2)
     plt.plot(epochs, val_losses, label='Validation Loss', color='darkorange', linewidth=2)
     
-    plt.title('Training & Validation Loss', fontsize=14, pad=10)
-    plt.xlabel('Epoch', fontsize=12)
-    plt.ylabel('BCE Loss', fontsize=12)
+    # plt.title('Training & Validation Loss', fontsize=14, pad=10)
+    plt.xlabel('Epoch', fontsize=14)
+    plt.ylabel('BCE Loss', fontsize=14)
     plt.legend(fontsize=11)
     plt.grid(True, linestyle='--', alpha=0.7)
-    plt.tick_params(axis='both', labelsize=10)
-    plt.tight_layout()
+    plt.tick_params(axis='both', labelsize=12)
     
-    plt.savefig(out_path, dpi=300)
+    plt.subplots_adjust(bottom=0.15) # Increase this number (e.g., 0.20) if it still clips
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
     print(f"📈 Loss curve saved to: '{out_path}'")
     plt.close()
 
@@ -87,6 +87,7 @@ def save_audio_and_features(waveform, log_mel, sample_rate, label):
     fig2.colorbar(cax, ax=ax2, format="%+2.0f")
         
     save_path2 = os.path.join(IMAGES_DIR, f"log_mel_{label}.png")
+
     fig2.savefig(save_path2, dpi=300, bbox_inches='tight')
     print(f"Log Mel plot saved to: {save_path2}")
     plt.close(fig2)
@@ -115,7 +116,6 @@ def plot_confusion_matrix(y_true, y_pred, model_name="Model", filename="confusio
     ax.set_ylabel('True Label (What the audio actually was)', fontsize=12)
     
     out_path = os.path.join(IMAGES_DIR, filename)
-    plt.tight_layout()
     plt.savefig(out_path, dpi=300)
     print(f"🔲 Confusion matrix saved to: '{out_path}'")
     plt.close()
@@ -232,7 +232,6 @@ def plot_in_action_gate(model_path, speech_path, artifact_path, threshold=0.5):
     ax3.set_ylabel('Amplitude')
     ax3.grid(True, alpha=0.3)
 
-    plt.tight_layout()
     out_path = os.path.join(IMAGES_DIR, "in_action_gate.png")
     plt.savefig(out_path, dpi=300)
     print(f"📉 In-Action plot saved to: '{out_path}'")
