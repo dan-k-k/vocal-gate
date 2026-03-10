@@ -47,6 +47,7 @@ builds/
 # ONNX Runtime (Ignore the folder, but keep the specific dylib if you rely on it locally)
 plugin/onnxruntime/lib/*
 !plugin/onnxruntime/lib/libonnxruntime.dylib
+!plugin/onnxruntime/lib/libonnxruntime.1.24.2.dylib
 
 # Generated Media & Plots
 videos/
