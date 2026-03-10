@@ -44,11 +44,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createPa
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"shift", 1}, "Shift", shiftRange, 0.0f));
 
-    // 6. P Smooth
+    // 6. Smooth
     juce::NormalisableRange<float> probSmoothRange (100.0f, 1200.0f, 1.0f);
     probSmoothRange.setSkewForCentre (400.0f);
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"probsmoothing", 1}, "P Smooth", probSmoothRange, 400.0f));
+        juce::ParameterID{"probsmoothing", 1}, "Smooth", probSmoothRange, 400.0f));
 
     return { params.begin(), params.end() };
 }

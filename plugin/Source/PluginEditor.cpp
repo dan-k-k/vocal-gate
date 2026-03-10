@@ -42,10 +42,10 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
     juce::Colour envelopeColor = juce::Colour::fromRGB(40, 210, 180);
 
     setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", "threshold", thresholdAttachment, detectionColor);
-    setupKnob(floorSlider, floorLabel, "Floor", " dB", "floor", floorAttachment, detectionColor);
-    setupKnob(probSmoothSlider, probSmoothLabel, "P Smooth", " ms", "probsmoothing", probSmoothAttachment, detectionColor);
+    setupKnob(probSmoothSlider, probSmoothLabel, "Smooth", " ms", "probsmoothing", probSmoothAttachment, detectionColor);
     setupKnob(shiftSlider, shiftLabel, "Shift", " ms", "shift", shiftAttachment, detectionColor);
 
+    setupKnob(floorSlider, floorLabel, "Floor", " dB", "floor", floorAttachment, envelopeColor);
     setupKnob(attackSlider, attackLabel, "Attack", " ms", "attack", attackAttachment, envelopeColor);
     setupKnob(releaseSlider, releaseLabel, "Release", " ms", "release", releaseAttachment, envelopeColor);
 
@@ -163,13 +163,13 @@ void VocalGateEditor::resized()
     int knobWidth = bottomArea.getWidth() / 6; 
     int shiftDown = 8;
 
-    // Det
+    // Detection (Orange Knobs - Left Side)
     thresholdSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
-    floorSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     probSmoothSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     shiftSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     
-    // Env
+    // Envelope (Blue Knobs - Right Side)
+    floorSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     attackSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     releaseSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
 }
