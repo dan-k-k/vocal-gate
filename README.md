@@ -1,4 +1,4 @@
-# Vocal Gate macOS VST3/AU/Standalone
+## Vocal Gate macOS VST3/AU/Standalone
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. Built for macOS (M-series).
 
