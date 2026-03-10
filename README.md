@@ -22,6 +22,7 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
 You can download the compiled installer from the [Releases](../../releases) tab.
 
 **Note on Installation:** This installer is unsigned. To install it, you must right-click open the `.pkg` file.
+Additionally, macOS might block your DAW from scanning it. If it doesn't show up, go to System Settings > Privacy & Security, find the Vocal Gate block warning, and click "Open Anyway". Then rescan your plugins.
 ---
 
 ## Model Performance

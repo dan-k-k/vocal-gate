@@ -1,0 +1,56 @@
+# .github/workflows/release.yml
+name: Build Release Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # <-- ADD THIS LINE!
+
+jobs:
+  build-windows:
+    name: Build Windows VST3 Installer
+    runs-on: windows-latest # This provides MSVC, CMake, and Inno Setup automatically!
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # --- 1. PREPARE DEPENDENCIES ---
+    - name: Download Windows ONNX Runtime
+      # You need the Windows .lib and .dll for the linker to work.
+      # If these aren't in your repo, you must download them here and put 
+      # them in plugin/onnxruntime/lib/ as your CMake expects.
+      run: |
+        mkdir -p plugin/onnxruntime/lib
+        # (Insert your script to download/unzip the Windows ONNX release here)
+        # touch plugin/onnxruntime/lib/onnxruntime.lib 
+        # touch plugin/onnxruntime/lib/onnxruntime.dll
+
+    # --- 2. COMPILE C++ ---
+    - name: Configure CMake
+      # Windows defaults to the MSVC compiler, which is exactly what we want.
+      run: cmake -B build -S plugin
+
+    - name: Build VST3
+      # We specify Release config. Your CMake already handles copying the .dll 
+      # next to the .vst3 in the POST_BUILD step!
+      run: cmake --build build --config Release --target VocalGate_VST3 --parallel 4
+
+    # --- 3. BUILD INSTALLER ---
+    - name: Compile Inno Setup Installer
+      # Windows-latest runners have Inno Setup pre-installed! 
+      # 'iscc' is the command-line tool for Inno Setup.
+      run: iscc installer.iss
+
+    # --- 4. UPLOAD ASSET ---
+    - name: Upload Windows Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: VocalGate-Windows-Installer
+        # This is the output file your installer.iss will create
+        path: Output/VocalGate_Windows_Installer.exe
+
+  
