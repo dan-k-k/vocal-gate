@@ -42,13 +42,6 @@ jobs:
       with:
         submodules: recursive 
 
-    - name: Bypass CMake ONNX Requirement
-      run: |
-        # We still need this dummy file so CMake's configure step doesn't crash 
-        # when reading juce_add_binary_data.
-        mkdir -p plugin 
-        touch plugin/vocalgate_int8.onnx
-
     - name: Configure CMake
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
 
@@ -76,15 +69,6 @@ jobs:
     # you MUST add your "Option A" fetch step here to download it!
     # Otherwise, the macOS linker will fail to bundle it.
     
-    - name: Provide ONNX Model
-      run: |
-        mkdir -p plugin 
-        # Since your C++ has a try/catch block around the ONNX load, 
-        # a dummy file will allow the plugin to open without crashing the DAW. 
-        # This perfectly tests the dynamic linking (dyld) without needing 
-        # to upload a massive ML model to GitHub Actions!
-        touch plugin/vocalgate_int8.onnx
-
     - name: Configure CMake
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
 
@@ -124,17 +108,13 @@ jobs:
       run: |
         mkdir -p plugin/onnxruntime/lib
         
-        # 1. Download the official ONNX Runtime for Windows x64 
-        # (I am using v1.14.1 here as a stable standard, adjust if your Mac uses a different specific version)
-        curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip" -o onnx_win.zip
+        # 1. Download the Windows x64 version!
+        curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-win-x64-1.24.2.zip" -o onnx_win.zip
         unzip onnx_win.zip
         
-        # 2. Copy the real .lib and .dll into your CMake's expected folder
-        cp onnxruntime-win-x64-1.14.1/lib/onnxruntime.lib plugin/onnxruntime/lib/
-        cp onnxruntime-win-x64-1.14.1/lib/onnxruntime.dll plugin/onnxruntime/lib/
-        
-        # 3. We can still fake the model itself since that is only loaded at runtime!
-        touch plugin/vocalgate_int8.onnx
+        # 2. Copy the real Windows .lib and .dll
+        cp onnxruntime-win-x64-1.24.2/lib/onnxruntime.lib plugin/onnxruntime/lib/
+        cp onnxruntime-win-x64-1.24.2/lib/onnxruntime.dll plugin/onnxruntime/lib/
 
     - name: Configure CMake
       run: cmake -B build -S plugin

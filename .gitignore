@@ -26,6 +26,8 @@ ml_pipeline/data/
 *.pt
 *.pth
 *.onnx
+!plugin/vocalgate_int8.onnx
+!plugin/FredokaOne.ttf
 *.onnx.data
 ml_pipeline/models/
 ml_pipeline/plot_dataset_energy.py
