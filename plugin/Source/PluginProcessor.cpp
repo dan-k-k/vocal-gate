@@ -6,6 +6,9 @@
 #include <cmath>
 #include <algorithm>
 #include <BinaryData.h>
+#if JUCE_WINDOWS
+#include <windows.h>
+#endif
 
 juce::AudioProcessorValueTreeState::ParameterLayout VocalGateProcessor::createParameterLayout()
 {
@@ -67,6 +70,18 @@ VocalGateProcessor::VocalGateProcessor()
        apvts(*this, nullptr, "Parameters", createParameterLayout()) 
 #endif
 {
+    // --- ADD THIS WINDOWS DELAY LOAD FIX ---
+    #if JUCE_WINDOWS
+    // 1. Get the path to the actual .vst3 file/folder being executed
+    juce::File pluginFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    
+    // 2. Get the directory containing the VST3 (where onnxruntime.dll lives)
+    juce::String pluginDirectory = pluginFile.getParentDirectory().getFullPathName();
+    
+    // 3. Tell Windows to add this directory to the DLL search path
+    SetDllDirectoryW(pluginDirectory.toWideCharPointer());
+    #endif
+    
     // Atomic pointers
     thresholdParam     = apvts.getRawParameterValue("threshold");
     floorParam         = apvts.getRawParameterValue("floor");

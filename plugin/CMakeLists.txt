@@ -110,10 +110,14 @@ if(APPLE)
     )
 
 elseif(WIN32)
-    # WINDOWS SETUP (Ready for later)
+    # WINDOWS SETUP
     target_link_libraries(VocalGate PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.lib
+        Delayimp # <--- ADD THIS
     )
+
+    # Tell MSVC to delay load the ONNX dll
+    target_link_options(VocalGate PRIVATE "/DELAYLOAD:onnxruntime.dll")
 
     add_custom_command(TARGET VocalGate_VST3 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
