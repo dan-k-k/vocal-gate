@@ -66,11 +66,11 @@ private:
     void runONNXModel();
 
     // ONNX runtime
-    Ort::Env onnxEnv{ORT_LOGGING_LEVEL_WARNING, "VocalGate"};
+    std::unique_ptr<Ort::Env> onnxEnv;
     std::unique_ptr<Ort::Session> onnxSession;
     
     // Plugin memory
-    Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    std::unique_ptr<Ort::MemoryInfo> memoryInfo;
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     std::atomic<float>* thresholdParam = nullptr;
