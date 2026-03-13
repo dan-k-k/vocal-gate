@@ -70,16 +70,23 @@ VocalGateProcessor::VocalGateProcessor()
        apvts(*this, nullptr, "Parameters", createParameterLayout()) 
 #endif
 {
-    // --- ADD THIS WINDOWS DELAY LOAD FIX ---
+    // --- 1. SET WINDOWS DLL DIRECTORY FIRST ---
     #if JUCE_WINDOWS
-    // 1. Get the path to the actual .vst3 file/folder being executed
-    juce::File pluginFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
-    
-    // 2. Get the directory containing the VST3 (where onnxruntime.dll lives)
-    juce::String pluginDirectory = pluginFile.getParentDirectory().getFullPathName();
-    
-    // 3. Tell Windows to add this directory to the DLL search path
-    SetDllDirectoryW(pluginDirectory.toWideCharPointer());
+    // Get the handle to THIS specific VST3 module in memory, NOT the host DAW
+    HMODULE hModule = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       (LPCWSTR)&createPluginFilter, &hModule);
+
+    if (hModule != nullptr)
+    {
+        wchar_t path[MAX_PATH];
+        GetModuleFileNameW(hModule, path, MAX_PATH);
+        juce::File pluginDllFile(juce::String(path));
+        
+        // This targets the VST3's x86_64-win folder where your CMake puts the dll
+        juce::String pluginDirectory = pluginDllFile.getParentDirectory().getFullPathName();
+        SetDllDirectoryW(pluginDirectory.toWideCharPointer());
+    }
     #endif
     
     // Atomic pointers
@@ -95,8 +102,15 @@ VocalGateProcessor::VocalGateProcessor()
     sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
     try {
+        onnxEnv = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "VocalGate");
+        memoryInfo = std::make_unique<Ort::MemoryInfo>(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
+
+        Ort::SessionOptions sessionOptions;
+        sessionOptions.SetIntraOpNumThreads(1);
+        sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
         onnxSession = std::make_unique<Ort::Session>(
-            onnxEnv, 
+            *onnxEnv, // Dereference the pointer
             BinaryData::vocalgate_int8_onnx, 
             BinaryData::vocalgate_int8_onnxSize, 
             sessionOptions
@@ -403,18 +417,18 @@ void VocalGateProcessor::processMLHop(const float* hopData)
 
 void VocalGateProcessor::runONNXModel()
 {
-    // Input tensor wrapper
+    // Input tensor wrapper (add * to memoryInfo)
     Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
-        memoryInfo, 
+        *memoryInfo, 
         logMelFeatures.data(), 
         logMelFeatures.size(), 
         inputShape, 
         4
     );
 
-    // Output tensor wrapper pointing to the pre-allocated array
+    // Output tensor wrapper (add * to memoryInfo)
     Ort::Value outputTensor = Ort::Value::CreateTensor<float>(
-        memoryInfo,
+        *memoryInfo,
         outputLogitData.data(),
         outputLogitData.size(),
         outputShape,
