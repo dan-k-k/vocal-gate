@@ -98,8 +98,7 @@ VocalGateProcessor::VocalGateProcessor()
     shiftParam         = apvts.getRawParameterValue("shift");
     probSmoothingParam = apvts.getRawParameterValue("probsmoothing");
 
-    sessionOptions.SetIntraOpNumThreads(1);
-    sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+    // REMOVED THE TWO OUT-OF-SCOPE LINES HERE
 
     try {
         onnxEnv = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "VocalGate");
@@ -110,7 +109,7 @@ VocalGateProcessor::VocalGateProcessor()
         sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
         onnxSession = std::make_unique<Ort::Session>(
-            *onnxEnv, // Dereference the pointer
+            *onnxEnv, 
             BinaryData::vocalgate_int8_onnx, 
             BinaryData::vocalgate_int8_onnxSize, 
             sessionOptions
