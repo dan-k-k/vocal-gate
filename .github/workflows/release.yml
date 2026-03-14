@@ -43,9 +43,12 @@ jobs:
       run: cmake --build build --config Release --target VocalGate_VST3 --parallel 4
 
     # --- 3. BUILD INSTALLER ---
+    - name: Download VC++ Redistributable
+      shell: bash
+      # Downloads the official installer and places it next to your .iss script
+      run: curl -L "https://aka.ms/vs/17/release/vc_redist.x64.exe" -o vc_redist.x64.exe
+
     - name: Compile Inno Setup Installer
-      # Windows-latest runners have Inno Setup pre-installed! 
-      # 'iscc' is the command-line tool for Inno Setup.
       run: iscc installer.iss
 
     # --- 4. UPLOAD ASSET ---

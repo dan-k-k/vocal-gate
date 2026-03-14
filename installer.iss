@@ -10,20 +10,26 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 ArchitecturesInstallIn64BitMode=x64 arm64
-; Output settings
 OutputDir=Output
 OutputBaseFilename=VocalGate_Windows_Installer
 Compression=lzma
 SolidCompression=yes
-; Require admin rights to install to Program Files
 PrivilegesRequired=admin
-; No need for a Start Menu folder for a VST plugin
 DisableProgramGroupPage=yes
 
 [Files]
-; Grab the entire VST3 bundle folder (which includes your .vst3 and the copied onnxruntime.dll)
-; Note: Check your exact CMake output path. Usually it's build/plugin/VocalGate_VST3.dir/Release/ or similar.
+; 1. The VST3 Plugin
 Source: "build\VocalGate_artefacts\Release\VST3\Vocal Gate.vst3\*"; DestDir: "{commoncf64}\VST3\Vocal Gate.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; 2. Bundle the VC++ Redistributable into a temporary folder
+Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+
+[Run]
+; 3. Execute the Redistributable silently during installation
+; /install = Installs it
+; /passive = Shows a basic progress bar but requires no user interaction
+; /norestart = Prevents the redist installer from rebooting the user's PC automatically
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /passive /norestart"; StatusMsg: "Installing Visual C++ Redistributable (Required for AI features)..."; Flags: waituntilterminated
 
 [Messages]
 BeveledLabel=DanK
