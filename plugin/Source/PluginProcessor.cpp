@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <BinaryData.h>
 #if JUCE_WINDOWS
+#define NOMINMAX
 #include <windows.h>
 #endif
 
@@ -81,7 +82,7 @@ VocalGateProcessor::VocalGateProcessor()
     {
         wchar_t path[MAX_PATH];
         GetModuleFileNameW(hModule, path, MAX_PATH);
-        juce::File pluginDllFile(juce::String(path));
+        auto pluginDllFile = juce::File(juce::String(path));
         
         // This targets the VST3's x86_64-win folder where your CMake puts the dll
         juce::String pluginDirectory = pluginDllFile.getParentDirectory().getFullPathName();
@@ -97,7 +98,6 @@ VocalGateProcessor::VocalGateProcessor()
     shiftParam         = apvts.getRawParameterValue("shift");
     probSmoothingParam = apvts.getRawParameterValue("probsmoothing");
 
-    Ort::SessionOptions sessionOptions;
     sessionOptions.SetIntraOpNumThreads(1);
     sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
