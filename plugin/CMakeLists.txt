@@ -111,14 +111,17 @@ if(APPLE)
 
 elseif(WIN32)
     # WINDOWS SETUP
+    # 1. Link the .lib to the base JUCE target
     target_link_libraries(VocalGate PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.lib
-        Delayimp # <--- ADD THIS
     )
 
-    # Tell MSVC to delay load the ONNX dll
-    target_link_options(VocalGate PRIVATE "/DELAYLOAD:onnxruntime.dll")
+    # 2. APPLY DELAY LOAD TO THE ACTUAL VST3 TARGET
+    # (If you add a Standalone build later, you'll need to duplicate these two lines for VocalGate_Standalone)
+    target_link_libraries(VocalGate_VST3 PRIVATE Delayimp)
+    target_link_options(VocalGate_VST3 PRIVATE "/DELAYLOAD:onnxruntime.dll")
 
+    # 3. Copy the DLL next to the VST3 (Keep this exactly as you had it)
     add_custom_command(TARGET VocalGate_VST3 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.dll"
