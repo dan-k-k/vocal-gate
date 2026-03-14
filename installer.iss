@@ -12,6 +12,8 @@ DefaultDirName={autopf}\{#MyAppName}
 ArchitecturesInstallIn64BitMode=x64 arm64
 OutputDir=Output
 OutputBaseFilename=VocalGate_Windows_Installer
+; ADD THIS LINE:
+RestartIfNeededByRun=no
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
