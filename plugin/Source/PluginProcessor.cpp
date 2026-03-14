@@ -71,7 +71,7 @@ VocalGateProcessor::VocalGateProcessor()
        apvts(*this, nullptr, "Parameters", createParameterLayout()) 
 #endif
 {
-    // --- 1. SET WINDOWS DLL DIRECTORY FIRST ---
+    // --- 1. EXPLICITLY LOAD WINDOWS DLL FIRST ---
     #if JUCE_WINDOWS
     // Get the handle to THIS specific VST3 module in memory, NOT the host DAW
     HMODULE hModule = nullptr;
@@ -84,9 +84,12 @@ VocalGateProcessor::VocalGateProcessor()
         GetModuleFileNameW(hModule, path, MAX_PATH);
         auto pluginDllFile = juce::File(juce::String(path));
         
-        // This targets the VST3's x86_64-win folder where your CMake puts the dll
-        juce::String pluginDirectory = pluginDllFile.getParentDirectory().getFullPathName();
-        SetDllDirectoryW(pluginDirectory.toWideCharPointer());
+        // Target the exact onnxruntime.dll sitting next to our VST3 binary
+        auto onnxDllPath = pluginDllFile.getParentDirectory().getChildFile("onnxruntime.dll").getFullPathName();
+        
+        // Force the OS to load it directly. 
+        // When the delay-load helper looks for it a millisecond from now, it will already be in memory!
+        LoadLibraryW(onnxDllPath.toWideCharPointer());
     }
     #endif
     
