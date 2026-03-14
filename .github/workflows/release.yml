@@ -56,7 +56,7 @@ jobs:
         # This is the output file your installer.iss will create
         path: Output/VocalGate_Windows_Installer.exe
 
-build-macos:
+  build-macos:
     name: Build macOS Installer
     runs-on: macos-latest
 
