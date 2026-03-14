@@ -67,24 +67,23 @@ jobs:
         submodules: recursive
 
     # --- 1. PREPARE DEPENDENCIES ---
-    - name: Download Mac ONNX Runtime
+    - name: Download Mac ONNX Runtime (Apple Silicon Only)
       run: |
         mkdir -p plugin/onnxruntime/lib
         mkdir -p plugin/onnxruntime/include
         
-        # Download the Mac ONNX Runtime (Universal binary or just matching what you used)
-        curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-osx-universal2-1.24.2.tgz" -o onnx_mac.tgz
+        # Grab the ARM64 specific binary (Notice the URL change here!)
+        curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-osx-arm64-1.24.2.tgz" -o onnx_mac.tgz
         tar -xzf onnx_mac.tgz
         
-        # Copy the dylib to where your CMake expects it
-        cp onnxruntime-osx-universal2-1.24.2/lib/libonnxruntime.1.24.2.dylib plugin/onnxruntime/lib/
-        # Also copy headers if your CMake expects them locally!
-        cp -R onnxruntime-osx-universal2-1.24.2/include/* plugin/onnxruntime/include/
+        # Copy the arm64 dylib and headers
+        cp onnxruntime-osx-arm64-1.24.2/lib/libonnxruntime.1.24.2.dylib plugin/onnxruntime/lib/
+        cp -R onnxruntime-osx-arm64-1.24.2/include/* plugin/onnxruntime/include/
 
     # --- 2. COMPILE C++ ---
     - name: Configure CMake
-      # Build for both Apple Silicon (arm64) and Intel (x86_64)
-      run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+      # CRITICAL: We changed CMAKE_OSX_ARCHITECTURES to ONLY "arm64". We removed "x86_64".
+      run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64"
 
     - name: Build Plugins (VST3 & AU)
       run: cmake --build build --config Release --parallel 4
