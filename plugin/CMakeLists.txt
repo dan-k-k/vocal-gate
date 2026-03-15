@@ -88,15 +88,22 @@ if(APPLE)
         )
 
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-            # Create Frameworks folder
+            # 1. Create Frameworks folder inside the plugin bundle
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks"
             
-            # Copy ONNX
+            # 2. Copy the ONNX dylib into that Frameworks folder
             COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib"
                 "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.1.24.2.dylib"
             
-            # Sign the dylib, then sign the bundle
+            # 3. FIX: Change the internal link from @rpath to @loader_path
+            # Using $<TARGET_FILE:...> ensures we target the actual compiled binary regardless of spaces in the name
+            COMMAND install_name_tool -change 
+                @rpath/libonnxruntime.1.24.2.dylib 
+                @loader_path/../Frameworks/libonnxruntime.1.24.2.dylib 
+                "$<TARGET_FILE:${TARGET_NAME}>"
+
+            # 4. Sign the dylib, then sign the whole bundle
             COMMAND codesign --force --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.1.24.2.dylib"
             COMMAND codesign --force --deep --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../.."
         )
