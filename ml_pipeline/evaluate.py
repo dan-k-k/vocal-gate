@@ -1,7 +1,7 @@
 # ml_pipeline/evaluate.py
 import os
 import torch
-import torch.nn as nn # <--- Added nn for the Sequential block
+import torch.nn as nn # 
 import torchaudio.transforms as T
 from torch.utils.data import DataLoader
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_curve, auc, confusion_matrix
@@ -17,20 +17,19 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch.functional
 
 DATA_DIR = "./data"
 IMAGES_DIR = "../images"
-# We now evaluate a list of models to compare them
+
 MODELS_TO_TEST = {
     "Original": "./models/vocalgate_best.pt",
     "Pruned": "./models/vocalgate_pruned.pt",
-    "P+Q": "../plugin/vocalgate_int8.onnx" # <--- Update this path!
+    "P+Q": "../plugin/vocalgate_int8.onnx" 
 }
 threshold=0.5; print(f"Threshold={threshold}")
 
 def evaluate_single_model(model_name, model_path, test_loader, device, log_mel_transform):
-    """Evaluates a single model and returns its scores and metrics."""
     print(f"\nEvaluating: {model_name}...")
     
     if not os.path.exists(model_path):
-        print(f"⚠️ Skipping {model_name}: Model not found at {model_path}")
+        print(f"Skipping {model_name}: not found at {model_path}")
         return None
 
     model = VocalGateModel().to(device)
@@ -57,19 +56,18 @@ def evaluate_single_model(model_name, model_path, test_loader, device, log_mel_t
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     fpr = (fp / (fp + tn)) * 100
 
-    print(f"Precision: {precision:.4f} | Recall: {recall:.4f} | F1: {f1:.4f}")
-    print(f"🚨 False Positive Rate (Hallucinated Mutes): {fpr:.2f}%")
+    print(f"Precision: {precision:.4f}, recall: {recall:.4f}, F1: {f1:.4f}")
+    print(f"FPR: {fpr:.2f}%")
     
     plot_confusion_matrix(y_true, y_pred, model_name, filename=f"cm_{model_name.replace(' ', '_')}.png")
 
     return y_true, y_scores
 
 def evaluate_onnx_model(model_name, model_path, test_loader, log_mel_transform, device):
-    """Evaluates an ONNX model using the ONNX Runtime engine."""
     print(f"\nEvaluating: {model_name}...")
     
     if not os.path.exists(model_path):
-        print(f"⚠️ Skipping {model_name}: Model not found at {model_path}")
+        print(f"Skipping {model_name}: not found at {model_path}")
         return None
 
     session = ort.InferenceSession(model_path)
@@ -78,15 +76,15 @@ def evaluate_onnx_model(model_name, model_path, test_loader, log_mel_transform, 
     y_true, y_scores = [], []
 
     for features, labels in test_loader:
-        features = features.to(device)      # <-- ADDED THIS LINE
-        features = log_mel_transform(features) # <-- ADDED THIS LINE
+        features = features.to(device)
+        features = log_mel_transform(features)
         
         features_np = features.cpu().numpy()
         labels_np = labels.cpu().numpy().flatten()
         
-        # ONNX is locked to batch_size=1, so we process the batch 1 by 1
+        # ONNX is locked to batch_size=1
         for i in range(features_np.shape[0]):
-            # Slice to keep the batch dimension: shape [1, 1, 40, 61]
+            # Shape [1, 1, 40, 61]
             single_feature = features_np[i:i+1] 
             
             outputs = session.run(None, {input_name: single_feature})
@@ -107,8 +105,8 @@ def evaluate_onnx_model(model_name, model_path, test_loader, log_mel_transform, 
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     fpr = (fp / (fp + tn)) * 100
 
-    print(f"Precision: {precision:.4f} | Recall: {recall:.4f} | F1: {f1:.4f}")
-    print(f"🚨 False Positive Rate (Hallucinated Mutes): {fpr:.2f}%")
+    print(f"Precision: {precision:.4f}, recall: {recall:.4f}, F1: {f1:.4f}")
+    print(f"FPR: {fpr:.2f}%")
     
     plot_confusion_matrix(y_true, y_pred, model_name, filename=f"cm_{model_name.replace(' ', '_')}.png")
     
@@ -130,20 +128,16 @@ def main():
         T.AmplitudeToDB(stype='power', top_db=80.0)
     ).to(device)
 
-    # REMOVED transform=mfcc_transform
     test_dataset = VocalGateDataset(split_dir=os.path.join(DATA_DIR, "test"), augment=False) 
     test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
-    # Setup the plot
     os.makedirs(IMAGES_DIR, exist_ok=True)
     plt.figure(figsize=(6, 4))
     
-    colors = ['darkorange', 'dodgerblue', 'forestgreen'] # Added a 3rd color
+    colors = ['darkorange', 'dodgerblue', 'forestgreen'] 
 
-    # Loop through our models and overlay them on the same graph
     for i, (model_name, model_path) in enumerate(MODELS_TO_TEST.items()):
         
-        # Route to the correct evaluator based on file type
         if model_path.endswith('.onnx'):
             results = evaluate_onnx_model(model_name, model_path, test_loader, log_mel_transform, device) 
         else:
@@ -169,7 +163,7 @@ def main():
 
     save_path = os.path.join(IMAGES_DIR, "roc_curve_comparison.png")
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    print(f"\n📊 Comparison ROC Curve saved to: {save_path}")
+    print(f"\nROC Curve saved to: {save_path}")
 
 if __name__ == "__main__":
     main()

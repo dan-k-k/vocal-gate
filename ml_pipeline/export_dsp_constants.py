@@ -4,7 +4,6 @@ import torch
 import torchaudio.transforms as T
 
 def tensor_to_cpp_array(tensor, name, is_2d=False):
-    """Converts a PyTorch tensor into a C++ const float array string."""
     tensor = tensor.squeeze().numpy()
     
     if not is_2d:
@@ -22,9 +21,8 @@ def tensor_to_cpp_array(tensor, name, is_2d=False):
         return cpp_str
 
 def main():
-    print("🧪 Initializing exact PyTorch MFCC Transform...")
+    print("Initialising PyTorch MFCC transform...")
     
-    # Use the exact same parameters from your training script!
     mel_transform = T.MelSpectrogram(
         sample_rate=16000,
         n_fft=512,
@@ -34,17 +32,11 @@ def main():
         window_fn=torch.hann_window
     )
 
-    # 1. Steal the Mel Filterbank Matrix
-    # Shape: [257, 40] (Freq bins x Mel bins)
-    mel_fb = mel_transform.mel_scale.fb
+    mel_fb = mel_transform.mel_scale.fb # [257, 40]
     
-    # 2. (No DCT matrix needed for Log Mels!)
-    
-    # 3. Steal the Window Function
-    # Shape: [512]
-    window = torch.hann_window(512)
+    window = torch.hann_window(512) # [512]
 
-    print("📝 Formatting matrices into C++ header...")
+    print("Formatting matrices into C++ header...")
     
     cpp_code = "#pragma once\n\n"
     cpp_code += "namespace DSPConstants {\n\n"
@@ -54,17 +46,15 @@ def main():
     
     cpp_code += "} // namespace DSPConstants\n"
 
-    # Save directly into your JUCE plugin source folder
     output_path = "../plugin/Source/DSPConstants.h"
     
-    # Ensure the directory exists (just in case)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     with open(output_path, "w") as f:
         f.write(cpp_code)
 
-    print(f"✅ Success! C++ constants saved to: {output_path}")
-    print(f"   -> Mel Filterbank shape: {mel_fb.shape}")
+    print(f"C++ constants saved to: {output_path}")
+    print(f"Mel filterbank shape: {mel_fb.shape}")
 
 if __name__ == "__main__":
     main()

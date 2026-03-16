@@ -9,10 +9,9 @@ if not os.path.exists(vocab_path):
 else:
     print("=== All Available FSD50K Labels ===")
     with open(vocab_path, 'r') as f:
-        # FSD50K vocabulary usually has ID, Label, and sometimes a MID
+        # FSD50K: ID, Label, sometimes a MID
         reader = csv.reader(f)
         for row in reader:
-            # Usually the label name is the second column (index 1)
-            if len(row) > 1:
+            if len(row) > 1: # Usually label in 2nd col
                 print(row[1])
 
