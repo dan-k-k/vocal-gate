@@ -50,7 +50,7 @@ target_include_directories(VocalGate
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/include
 )
 
-# Standard JUCE definitions
+# Standard JUCE definitions 
 target_compile_definitions(VocalGate
     PUBLIC
         JUCE_WEB_BROWSER=0
@@ -58,7 +58,7 @@ target_compile_definitions(VocalGate
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-# 1. Base JUCE linking (DO NOT DELETE THIS)
+# Base JUCE linking 
 target_link_libraries(VocalGate
     PRIVATE
         VocalGateData 
@@ -70,9 +70,9 @@ target_link_libraries(VocalGate
         juce::juce_recommended_warning_flags
 )
 
-# 2. OS-Specific Linking & Bundling
+# OS-Specific linking and bundling
 if(APPLE)
-    # MAC SETUP
+    # Mac, M-series. Requires Apple Dev Kit to allow external libraries (onnxruntime dylib) to work in DAW hardened runtime. Will need a new solution to get this running on Mac (raw c++, RTNeural, bundling the full onnx lib?) without buying Apple's Dev Kit :( .
     target_link_libraries(VocalGate PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib
     )
@@ -88,28 +88,22 @@ if(APPLE)
         )
 
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-            # 1. Create Frameworks folder inside the plugin bundle
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks"
             
-            # 2. Copy the ONNX dylib into that Frameworks folder
             COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib"
                 "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.1.24.2.dylib"
             
-            # 3. FIX: Change the internal link from @rpath to @loader_path
-            # Using $<TARGET_FILE:...> ensures we target the actual compiled binary regardless of spaces in the name
             COMMAND install_name_tool -change 
                 @rpath/libonnxruntime.1.24.2.dylib 
                 @loader_path/../Frameworks/libonnxruntime.1.24.2.dylib 
                 "$<TARGET_FILE:${TARGET_NAME}>"
 
-            # 4. Sign the dylib, then sign the whole bundle
             COMMAND codesign --force --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../Frameworks/libonnxruntime.1.24.2.dylib"
             COMMAND codesign --force --deep --sign - "$<TARGET_FILE_DIR:${TARGET_NAME}>/../.."
         )
     endforeach()
 
-    # Optional: Auto-copy VST3 to your local Mac plugins folder for testing
     add_custom_command(TARGET VocalGate_VST3 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
@@ -117,18 +111,14 @@ if(APPLE)
     )
 
 elseif(WIN32)
-    # WINDOWS SETUP
-    # 1. Link the .lib to the base JUCE target
+    # Windows x64
     target_link_libraries(VocalGate PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.lib
     )
 
-    # 2. APPLY DELAY LOAD TO THE ACTUAL VST3 TARGET
-    # (If you add a Standalone build later, you'll need to duplicate these two lines for VocalGate_Standalone)
     target_link_libraries(VocalGate_VST3 PRIVATE Delayimp)
     target_link_options(VocalGate_VST3 PRIVATE "/DELAYLOAD:onnxruntime.dll")
 
-    # 3. Copy the DLL next to the VST3 (Keep this exactly as you had it)
     add_custom_command(TARGET VocalGate_VST3 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/onnxruntime.dll"

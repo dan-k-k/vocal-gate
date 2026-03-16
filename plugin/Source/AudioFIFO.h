@@ -12,7 +12,7 @@ public:
         buffer.clear();
     }
 
-    // Called by the audio thread (fast)
+    // Called by the audio thread
     void push(const float* data, int numSamples)
     {
         int start1, size1, start2, size2;
