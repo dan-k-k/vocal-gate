@@ -12,7 +12,7 @@ __pycache__/
 *$py.class
 ml_pipeline/.venv/
 
-# ⚠️ THE BIG ONES: Datasets & Audio
+# Datasets & Audio
 ml_pipeline/ESC-50-master/
 ml_pipeline/FSD50K/
 ml_pipeline/LibriSpeech/
@@ -33,6 +33,7 @@ ml_pipeline/models/
 ml_pipeline/plot_dataset_energy.py
 ml_pipeline/yt_to_audio.py
 ml_pipeline/render_final_video.py
+ml_pipeline/check_labels.py
 
 # C++ / JUCE Plugin
 plugin/build/
