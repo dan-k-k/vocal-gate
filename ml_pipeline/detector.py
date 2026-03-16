@@ -31,6 +31,6 @@ raw_waveform, label = dataset[0]
 # 4. Apply the transform manually to inspect the features
 log_mel_features = log_mel_transform(raw_waveform)
 
-print(f"Label: {label.item()} (1.0 = Artifact, 0.0 = Vocal)")
-print(f"Log Mel Shape: {log_mel_features.shape} (channels x Mel bins x time frames)")
+print(f"Label: {label.item()} (1.0 = artifact, 0.0 = vocal)")
+print(f"Log mel shape: {log_mel_features.shape} (channels x Mel bins x time frames)")
 

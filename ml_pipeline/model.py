@@ -3,10 +3,6 @@ import torch
 import torch.nn as nn
 
 class DepthwiseSeparableConv(nn.Module):
-    """
-    A Depthwise Separable Convolution block.
-    Splits the spatial and channel-wise computations to save massive CPU cycles.
-    """
     def __init__(self, in_channels, out_channels):
         super(DepthwiseSeparableConv, self).__init__()
         
@@ -23,10 +19,8 @@ class DepthwiseSeparableConv(nn.Module):
 
 class VocalGateModel(nn.Module):
     def __init__(self, input_shape=(1, 40, 61), num_classes=1):
-        """
-        input_shape: (Channels, Mel_Bins, Time_Frames). 
-        Default (1, 40, 61) corresponds to 1 sec of 16kHz audio with hop_length=256 and 40 Mels.
-        """
+        """input_shape: (Channels, Mel_Bins, Time_Frames). 
+        (1, 40, 61) corresponds to 1 sec of 16kHz audio with hop_length=256 and 40 Mels."""
         super(VocalGateModel, self).__init__()
         
         self.conv_layers = nn.Sequential(
@@ -45,13 +39,11 @@ class VocalGateModel(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
         
-        # ISSUE 3 FIX: Dynamically calculate the flattened size
         self._flattened_size = None
         self._calculate_flattened_size(input_shape)
         
         self.fc_layers = nn.Sequential(
             nn.Dropout(p=0.5),           
-            # Now we use the dynamically calculated size instead of a hardcoded 1120!
             nn.Linear(self._flattened_size, 64), 
             nn.ReLU(),
             nn.Dropout(p=0.5),
@@ -59,17 +51,12 @@ class VocalGateModel(nn.Module):
         )
 
     def _calculate_flattened_size(self, shape):
-        """Passes a dummy tensor through the conv layers to figure out the output math."""
-        # Create a dummy tensor of zeros with a batch size of 1
         dummy_input = torch.zeros(1, *shape)
-        
-        # Pass it through the conv layers without tracking gradients
         with torch.no_grad():
             output = self.conv_layers(dummy_input)
             
-        # See how many features come out when we flatten it
         self._flattened_size = output.view(1, -1).size(1)
-        print(f"🔧 Model initialized! Dynamic flattened linear size: {self._flattened_size}")
+        print(f"Model initialised: dynamic flattened linear size: {self._flattened_size}")
 
     def forward(self, x):
         x = self.conv_layers(x)

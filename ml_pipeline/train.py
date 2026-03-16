@@ -4,7 +4,7 @@ import csv
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, WeightedRandomSampler # <--- ADDED HERE
+from torch.utils.data import DataLoader, WeightedRandomSampler
 import torchaudio.transforms as T
 from tqdm import tqdm
 import shutil 
@@ -13,17 +13,13 @@ from dataset import VocalGateDataset
 from model import VocalGateModel
 
 def process_batch(features, labels, model, criterion, device, feature_transform):
-    # 1. Move raw audio to the GPU
     features = features.to(device)
     labels = labels.float().to(device)
-    
-    # Apply the Log Mel Spectrogram math to the whole batch at once on the GPU
     features = feature_transform(features)
 
     outputs = model(features)
     loss = criterion(outputs, labels)
     
-    # Calculate True Positives, False Positives, False Negatives
     predictions = (outputs > 0.0).float()
     tp = ((predictions == 1.0) & (labels == 1.0)).float().sum()
     fp = ((predictions == 1.0) & (labels == 0.0)).float().sum()
@@ -45,8 +41,6 @@ def train():
     learning_rate = 1e-3
     data_dir = "./data"
 
-    # NEW FIX: Initialize the Log Mel transform and send it to the GPU
-    # We use nn.Sequential to chain the Mel generation and the Decibel conversion together
     feature_transform = nn.Sequential(
         T.MelSpectrogram(
             sample_rate=16000,
@@ -59,30 +53,24 @@ def train():
         T.AmplitudeToDB(stype='power', top_db=80.0)
     ).to(device)
 
-    # Initialize datasets WITHOUT the transform argument
     train_dataset = VocalGateDataset(split_dir=os.path.join(data_dir, "train"), augment=True)
     val_dataset = VocalGateDataset(split_dir=os.path.join(data_dir, "val"), augment=False)
     
-    print("⚖️ Calculating class weights for the sampler...")
+    print("Calculating class weights for the sampler...")
     class_counts = [0, 0] # [Clean Vocals (0), Artifacts (1)]
     for _, label, _ in train_dataset.samples:
         class_counts[label] += 1
-    print(f"📊 Training Class Counts - Vocals: {class_counts[0]} | Artifacts: {class_counts[1]}")
+    print(f"# Vocals: {class_counts[0]}, artifacts: {class_counts[1]}")
 
-    # 2. Calculate the weight for each class (inverse frequency)
     class_weights = [1.0 / class_counts[0], 1.0 / class_counts[1]]
-    
-    # 3. Assign a weight to every single sample in the dataset
     sample_weights = [class_weights[label] for _, label, _ in train_dataset.samples]
-    
-    # 4. Create the sampler
+
     sampler = WeightedRandomSampler(
         weights=sample_weights, 
         num_samples=len(sample_weights), 
         replacement=True
     )
     
-    # 5. Pass the sampler to the DataLoader (NOTE: shuffle must be False when using a sampler!)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
@@ -90,7 +78,6 @@ def train():
     criterion = nn.BCEWithLogitsLoss() 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Checkpoint logic remains exactly the same...
     patience = 10
     start_epoch = 0
     epochs_no_improve = 0
@@ -110,14 +97,13 @@ def train():
 
     try:
         for epoch in range(start_epoch, epochs):
-            # --- TRAINING ---
+            # Training
             model.train()
             train_loss, train_tp, train_fp, train_fn = 0.0, 0.0, 0.0, 0.0
             train_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Train]")
 
             for features, labels in train_bar:
                 optimizer.zero_grad()
-                # Pass feature_transform into the batch processor
                 loss, tp, fp, fn = process_batch(features, labels, model, criterion, device, feature_transform)
                 loss.backward()
                 optimizer.step()
@@ -132,7 +118,7 @@ def train():
             train_precision = train_tp / (train_tp + train_fp + 1e-7)
             train_recall = train_tp / (train_tp + train_fn + 1e-7)
 
-            # --- VALIDATION ---
+            # Validation
             model.eval()
             val_loss, val_tp, val_fp, val_fn = 0.0, 0.0, 0.0, 0.0
             val_bar = tqdm(val_loader, desc=f"Epoch {epoch+1}/{epochs} [Val]")
@@ -152,7 +138,7 @@ def train():
             
             print(f"Epoch {epoch+1} Summary | Val: | Loss: {avg_val_loss:.4f} | Precision: {val_precision:.4f} | Recall: {val_recall:.4f}")
 
-            # Logging & Checkpointing logic remains the same...
+            # Logging and checkpointing
             log_file = "./models/training_log.csv"
             file_exists = os.path.exists(log_file)
             with open(log_file, mode='a', newline='') as f:
@@ -181,13 +167,13 @@ def train():
             torch.save(checkpoint, latest_checkpoint_path)
             if is_best:
                 shutil.copyfile(latest_checkpoint_path, best_checkpoint_path)
-                print(f"💾 Saved new best model to {best_checkpoint_path}")
+                print(f"Saved new best model to {best_checkpoint_path}")
             if epochs_no_improve >= patience:
-                print(f"\n✋ Early stopping triggered.")
+                print(f"\nEarly stopping triggered.")
                 break 
 
     except KeyboardInterrupt:
-        print("\n🛑 Training interrupted safely.")
+        print("\nTraining interrupted.")
 
 if __name__ == "__main__":
     train()

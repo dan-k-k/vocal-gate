@@ -2,17 +2,15 @@
 import os
 import torch
 import onnx
-from onnxruntime.quantization import quantize_dynamic, QuantType, shape_inference # <-- Added shape_inference
+from onnxruntime.quantization import quantize_dynamic, QuantType, shape_inference
 
-# Import your new model
 from model import VocalGateModel
 
 def print_size_of_model(model_path):
-    """Returns the size of the saved model file in Kilobytes (KB)."""
     return os.path.getsize(model_path) / 1024
 
 def export_to_onnx():
-    print("🔋 Initialising PyTorch model...")
+    print("Initialising PyTorch model...")
     device = torch.device("cpu")
     model = VocalGateModel().to(device)
     
@@ -21,11 +19,11 @@ def export_to_onnx():
     os.makedirs(plugin_dir, exist_ok=True)
 
     fp32_onnx_path = os.path.join(plugin_dir, "vocalgate_fp32.onnx")
-    preprocessed_onnx_path = os.path.join(plugin_dir, "vocalgate_fp32_prep.onnx") # <-- Temp file for pre-processing
+    preprocessed_onnx_path = os.path.join(plugin_dir, "vocalgate_fp32_prep.onnx") # for preprocessing
     int8_onnx_path = os.path.join(plugin_dir, "vocalgate_int8.onnx")
     
     if not os.path.exists(weights_path):
-        raise FileNotFoundError(f"Error: trained weights '{weights_path}' not found. Run train.py first.")
+        raise FileNotFoundError(f"Error: trained weights '{weights_path}' not found. Run train.py and prune.py first.")
 
     print(f"Loading trained weights from {weights_path}...")
     checkpoint = torch.load(weights_path, map_location=device, weights_only=False)
@@ -40,7 +38,6 @@ def export_to_onnx():
 
     print(f"Exporting FP32 model to {fp32_onnx_path}...")
     
-    # FIX 1: Use opset_version=18 to prevent down-conversion corruption
     torch.onnx.export(
         model, 
         dummy_input, 
@@ -48,16 +45,16 @@ def export_to_onnx():
         export_params=True,
         opset_version=18, 
         do_constant_folding=True,
-        input_names=['input_log_mel'],  # <--- Renamed to match our new features
+        input_names=['input_log_mel'],
         output_names=['gate_logit'], 
     )
     
     onnx_model = onnx.load(fp32_onnx_path)
     onnx.save_model(onnx_model, fp32_onnx_path)
 
-    print("FP32 Export Complete. Pre-processing for quantization...")
+    print("FP32 export complete.")
 
-    # FIX 2: Pre-process the model to strictly infer and lock shapes
+    # Infer and lock shapes
     shape_inference.quant_pre_process(
         input_model_path=fp32_onnx_path,
         output_model_path=preprocessed_onnx_path,
@@ -67,7 +64,7 @@ def export_to_onnx():
 
     print("Pre-processing Complete. Starting ONNX INT8 Quantization...")
 
-    # Use the pre-processed model for the final quantization step
+    # Use pre-processed model for final quantisation
     quantize_dynamic(
         model_input=preprocessed_onnx_path,
         model_output=int8_onnx_path,
@@ -80,16 +77,14 @@ def export_to_onnx():
     size_int8 = print_size_of_model(int8_onnx_path)
     compression = (1 - (size_int8 / size_fp32)) * 100
 
-    print("\n=== 🚀 Pipeline Complete: Export Results ===")
-    print(f"Raw PyTorch Size: {size_pt:.2f} KB")
-    print(f"ONNX FP32 Size:   {size_fp32:.2f} KB")
-    print(f"ONNX INT8 Size:   {size_int8:.2f} KB")
-    print(f"Total Shrinkage:  {compression:.1f}% smaller!")
-    print(f"\n✅ Ready for JUCE! Link your C++ plugin to: '{int8_onnx_path}'")
+    print(f"Raw PyTorch Size {size_pt:.2f} KB")
+    print(f"ONNX FP32 Size: {size_fp32:.2f} KB")
+    print(f"ONNX INT8 Size: {size_int8:.2f} KB")
+    print(f"{compression:.1f}% smaller!")
+    print(f"\nSaved to: '{int8_onnx_path}'")
 
-    # Cleanup of the intermediate preprocessed file
     if os.path.exists(preprocessed_onnx_path):
-        os.remove(preprocessed_onnx_path)
+        os.remove(preprocessed_onnx_path) 
 
 if __name__ == "__main__":
     export_to_onnx()
