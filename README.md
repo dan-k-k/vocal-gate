@@ -8,11 +8,11 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
 
 <p align="center">
   <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Mac_Installer.pkg">
-    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.1-black?style=for-the-badge&logo=apple" alt="Download for macOS">
+    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.1-black?style=for-the-badge" alt="Download for macOS">
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Windows_Installer.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-0078D4?style=for-the-badge&logo=microsoft&logoColor=white" alt="Download for Windows">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge" alt="Download for Windows">
   </a>
 </p>
 

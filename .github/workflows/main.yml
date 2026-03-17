@@ -1,11 +1,19 @@
 # .github/workflows/main.yml
 name: Vocal Gate CI
 
-on:
+oon:
   push:
     branches: [ "**" ]
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+      - '.gitignore'
   pull_request:
     branches: [ "**" ]
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+      - '.gitignore'
 
 jobs:
   # Job 1: Python ML tests
