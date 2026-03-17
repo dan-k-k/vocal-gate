@@ -22,8 +22,12 @@ jobs:
     - name: Extract Version from Tag
       shell: bash
       run: |
-        TAG_NAME=${{ github.ref_name }}
-        VERSION=${TAG_NAME#v}
+        if [ "${{ github.ref_type }}" = "tag" ]; then
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v}
+        else
+          VERSION="0.0.0" # Dummy version for manual branch testing
+        fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     # Prepare dependencies
@@ -87,8 +91,12 @@ jobs:
     - name: Extract Version from Tag
       shell: bash
       run: |
-        TAG_NAME=${{ github.ref_name }}
-        VERSION=${TAG_NAME#v}
+        if [ "${{ github.ref_type }}" = "tag" ]; then
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v}
+        else
+          VERSION="0.0.0" # Dummy version for manual branch testing
+        fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     # Prepare dependencies
