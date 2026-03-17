@@ -1,13 +1,21 @@
 ## Vocal Gate VST3/AU/Standalone
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. 
+For M-series Macs, macOS 11+ | Windows 10+ 
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
 </p>
 
-[![Download for macOS](https://img.shields.io/badge/Download_for_macOS-v1.0.1-black?style=for-the-badge&logo=apple)](https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Mac_Installer.pkg)
-[![Download for Windows](https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows)](https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Windows_Installer.exe)
+<p align="center">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Mac_Installer.pkg">
+    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.1-black?style=for-the-badge&logo=apple" alt="Download for macOS">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Windows_Installer.exe">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows" alt="Download for Windows">
+  </a>
+</p>
 
 *Note: This installer is unsigned. You must right-click open the installer on macOS | press 'More info' and 'Run anyway' on Windows.*
 
