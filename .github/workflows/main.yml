@@ -1,7 +1,7 @@
 # .github/workflows/main.yml
 name: Vocal Gate CI
 
-oon:
+on:
   push:
     branches: [ "**" ]
     paths-ignore:
