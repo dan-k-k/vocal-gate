@@ -17,11 +17,7 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
 </p>
 
 <p align="center">
-  <small>🖥️ <b>Requires:</b> macOS 11+ (M-Series only) &nbsp;|&nbsp; Windows 10+</small><br>
-  <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Want to see what you're installing? Read the release notes here.</a></i>
-</p>
-
-<p align="center">
+  <small><b>Requires:</b> macOS 11+ (M-series only) &nbsp;|&nbsp; Windows 10+</small><br>
   <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i>
 </p>
 
