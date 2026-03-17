@@ -1,10 +1,15 @@
-## Vocal Gate macOS VST3/AU/Standalone
+## Vocal Gate VST3/AU/Standalone
 
-An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. Built for macOS (M-series).
+An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. 
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
 </p>
+
+[![Download for macOS](https://img.shields.io/badge/Download_for_macOS-v1.0.1-black?style=for-the-badge&logo=apple)](https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Mac_Installer.pkg)
+[![Download for Windows](https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows)](https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Windows_Installer.exe)
+
+*Note: This installer is unsigned. You must right-click open the installer on macOS | press 'More info' and 'Run anyway' on Windows.*
 
 ### Real-World Use Examples
 
@@ -15,14 +20,6 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
 </p>
 <p align="center"><i>Click the image above to watch the full demo on YouTube</i></p>
 
----
-
-## Installation (macOS: M-series)
-
-You can download the compiled installer from the [Releases](../../releases) tab.
-
-*Note on Installation*: This installer is unsigned. To install it, you must right-click open the `.pkg` file.
-Additionally, macOS might block your DAW from scanning it. If it doesn't show up, go to System Settings > Privacy & Security, find the Vocal Gate block warning, and click "Open Anyway". Then rescan your plugins.
 ---
 
 ## Model Performance

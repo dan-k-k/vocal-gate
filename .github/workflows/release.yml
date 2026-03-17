@@ -59,7 +59,7 @@ jobs:
       with:
         files: Output/VocalGate_Windows_Installer.exe
         name: Vocal Gate ${{ github.ref_name }} 
-        draft: false
+        draft: true
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -116,7 +116,7 @@ jobs:
       with:
         files: VocalGate_Mac_Installer.pkg
         name: Vocal Gate ${{ github.ref_name }} 
-        draft: false
+        draft: true
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
