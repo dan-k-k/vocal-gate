@@ -157,7 +157,6 @@ def main():
     plt.xlabel('FPR', fontsize=14)
     plt.ylabel('TPR', fontsize=14)
     plt.tick_params(axis='both', labelsize=12)
-    plt.title('Original, Pruned and Pruned+Quantised Gate Performance')
     plt.legend(loc="lower right", fontsize=11)
     plt.grid(alpha=0.3)
 

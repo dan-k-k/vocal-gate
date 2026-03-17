@@ -53,8 +53,8 @@ The plugin relies on a pruned and quantised ONNX model to achieve real-time infe
 </p>
 
 ### ROC 
-Pruning and quantising the model led to better performance in both ability (generalisation) and inference time.
+The pruned and quantised model has better performance in both inference time and ability on the test set (generalisation).
 <p align="center">
-  <img src="images/roc_curve_comparison.png" alt="roc_curve_comparison" width="500">
+  <img src="images/roc_curve_comparison1.png" alt="roc_curve_comparison" width="500">
 </p>
 
