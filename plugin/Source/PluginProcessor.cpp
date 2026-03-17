@@ -71,9 +71,9 @@ VocalGateProcessor::VocalGateProcessor()
        apvts(*this, nullptr, "Parameters", createParameterLayout()) 
 #endif
 {
-    // --- 1. EXPLICITLY LOAD WINDOWS DLL FIRST ---
+    // Load Windows DLL first
     #if JUCE_WINDOWS
-    // Get the handle to THIS specific VST3 module in memory, NOT the host DAW
+    // Get handle to this VST3 module
     HMODULE hModule = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        (LPCWSTR)&createPluginFilter, &hModule);
@@ -83,12 +83,8 @@ VocalGateProcessor::VocalGateProcessor()
         wchar_t path[MAX_PATH];
         GetModuleFileNameW(hModule, path, MAX_PATH);
         auto pluginDllFile = juce::File(juce::String(path));
-        
-        // Target the exact onnxruntime.dll sitting next to our VST3 binary
         auto onnxDllPath = pluginDllFile.getParentDirectory().getChildFile("onnxruntime.dll").getFullPathName();
-        
-        // Force the OS to load it directly. 
-        // When the delay-load helper looks for it a millisecond from now, it will already be in memory!
+        // Delay loader will find this VST3 in the path in memory
         LoadLibraryW(onnxDllPath.toWideCharPointer());
     }
     #endif
@@ -100,8 +96,6 @@ VocalGateProcessor::VocalGateProcessor()
     releaseParam       = apvts.getRawParameterValue("release");
     shiftParam         = apvts.getRawParameterValue("shift");
     probSmoothingParam = apvts.getRawParameterValue("probsmoothing");
-
-    // REMOVED THE TWO OUT-OF-SCOPE LINES HERE
 
     try {
         onnxEnv = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "VocalGate");
@@ -122,13 +116,12 @@ VocalGateProcessor::VocalGateProcessor()
         auto expectedInput = onnxSession->GetInputNameAllocated(0, allocator);
         auto expectedOutput = onnxSession->GetOutputNameAllocated(0, allocator);
         
-        juce::String msg = "✅ ONNX Loaded! Expected Input Name: " + juce::String(expectedInput.get()) + 
-                           ", Expected Output Name: " + juce::String(expectedOutput.get());
+        juce::String msg = "ONNX loaded. Expected input name: " + juce::String(expectedInput.get()) + ", Expected output name: " + juce::String(expectedOutput.get());
         
         juce::Logger::writeToLog(msg); 
     } 
     catch (const Ort::Exception& e) {
-        juce::Logger::writeToLog("🚨 ONNX LOAD CRASH: " + juce::String(e.what()));
+        juce::Logger::writeToLog("ONNX load crash: " + juce::String(e.what()));
     }
 }
 
