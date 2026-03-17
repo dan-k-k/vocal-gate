@@ -1,6 +1,12 @@
 # plugin/CMakeLists.txt
 # cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 # cmake --build builds/macOS --config Release --parallel 4
+
+# rm -rf ~/Library/Caches/AudioUnitCache/* 
+# sudo rm -rf /Library/Caches/AudioUnitCache/*
+# killall -9 AudioComponentRegistrar
+# sudo pkgutil --forget com.dank.vocalgate
+
 cmake_minimum_required(VERSION 3.15)
 
 if(DEFINED ENV{CI_VERSION})
