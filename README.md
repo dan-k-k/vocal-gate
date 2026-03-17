@@ -15,6 +15,9 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
     <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows" alt="Download for Windows">
   </a>
 </p>
+<p align="center">
+  <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Or read the release notes here.</a></i>
+</p>
 
 For M-series Macs, macOS 11+ | Windows 10+ 
 
