@@ -1,5 +1,5 @@
 # .github/workflows/main.yml
-name: Vocal Gate CI # 1. Changed the name!
+name: Vocal Gate CI
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
     branches: [ "**" ]
 
 jobs:
-  # Job 1: Python ML Tests
+  # Job 1: Python ML tests
   test-python:
     name: Python Unit Tests
     runs-on: ubuntu-latest
@@ -28,10 +28,9 @@ jobs:
         pip install pytest torch torchaudio soundfile librosa scikit-learn matplotlib numpy onnxruntime
 
     - name: Run PyTest
-      # 3. Just ensure your repository actually has a tests/Python/ folder!
       run: pytest tests/Python/
 
-  # Job 2: C++ FIFO & Buffer Tests
+  # Job 2: C++ tests
   test-cpp:
     name: C++ Unit Tests
     runs-on: macos-14
@@ -46,14 +45,12 @@ jobs:
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
 
     - name: Compile Tests Only
-      # This tells CMake to ONLY build the RunCPPTests executable, ignoring the main plugin
       run: cmake --build build --target RunCPPTests --parallel 4 
 
     - name: Run CTest
-      # NO MORE DYLD_LIBRARY_PATH! The tests are entirely self-sufficient now.
       run: ctest --test-dir build --output-on-failure
 
-  # Job 3: Integration Test (Plugin Validation macOS)
+  # Job 3: Integration test (plugin validation macOS)
   test-integration:
     name: Plugin Validation (macOS)
     runs-on: macos-14
@@ -63,36 +60,26 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive 
-
-    # --- IMPORTANT DEPENDENCY STEP ---
-    # If your libonnxruntime.dylib is NOT committed to your repo, 
-    # you MUST add your "Option A" fetch step here to download it!
-    # Otherwise, the macOS linker will fail to bundle it.
     
     - name: Configure CMake
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
 
     - name: Build VST3 Plugin
-      # Notice we are building the actual plugin target now, not RunCPPTests
       run: cmake --build build --target VocalGate_VST3 --parallel 4 
 
     - name: Download and Setup pluginval
       run: |
-        # Download the official pluginval macOS binary
         curl -L "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip" -o pluginval.zip
         unzip pluginval.zip
 
     - name: Run pluginval Integration Test
       run: |
-        # Because your CMakeLists.txt automatically copies the finished VST3 
-        # into the user's Library folder, we can test it directly from there!
-        
         ./pluginval.app/Contents/MacOS/pluginval \
           --strictness-level 5 \
           --validate-in-process \
           --validate "$HOME/Library/Audio/Plug-Ins/VST3/Vocal Gate.vst3"
 
-# Job 4: Integration Test (Plugin Validation - Windows)
+  # Job 4: Integration test (plugin validation Windows)
   test-integration-windows:
     name: Plugin Validation (Windows)
     runs-on: windows-latest
@@ -108,11 +95,9 @@ jobs:
       run: |
         mkdir -p plugin/onnxruntime/lib
         
-        # 1. Download the Windows x64 version!
         curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-win-x64-1.24.2.zip" -o onnx_win.zip
         unzip onnx_win.zip
         
-        # 2. Copy the real Windows .lib and .dll
         cp onnxruntime-win-x64-1.24.2/lib/onnxruntime.lib plugin/onnxruntime/lib/
         cp onnxruntime-win-x64-1.24.2/lib/onnxruntime.dll plugin/onnxruntime/lib/
 
@@ -120,11 +105,9 @@ jobs:
       run: cmake -B build -S plugin
 
     - name: Build VST3 Plugin
-      # Windows CMake usually needs the --config Release flag explicitly
       run: cmake --build build --config Release --target VocalGate_VST3 --parallel 4 
 
     - name: Download and Setup pluginval
-      # We use pwsh (PowerShell) to unzip on Windows
       shell: pwsh
       run: |
         curl -L "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -o pluginval.zip
@@ -133,7 +116,5 @@ jobs:
     - name: Run pluginval Integration Test
       shell: pwsh
       run: |
-        # Your CMakeLists.txt copies the Windows VST3 to COMMONPROGRAMFILES
-        # On GitHub runners, that translates to this exact path:
         .\pluginval\pluginval.exe --strictness-level 5 --validate-in-process --validate "C:\Program Files\Common Files\VST3\Vocal Gate.vst3"
 
