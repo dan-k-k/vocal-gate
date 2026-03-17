@@ -21,7 +21,7 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
 
 For M-series Macs, macOS 11+ | Windows 10+ 
 
-*Note: This installer is unsigned*. On macOS, right-click open the installer in your downloads | On Windows, press 'More info' and 'Run anyway'.
+*Note: This installer is unsigned*. On macOS, right-click open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'.
 
 ### Real-World Use Examples
 
