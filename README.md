@@ -12,7 +12,7 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Windows_Installer.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows&logoColor=white&v=2" alt="Download for Windows">
   </a>
 </p>
 
