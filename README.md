@@ -30,13 +30,13 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
     <img src="images/VocalGateThumbnail.png" alt="Vocal Gate Demo" width="500">
   </a>
 </p>
-<p align="center"><i>Click the image above to watch the full demo on YouTube</i></p>
+<p align="center"><i>Watch the full demo on YouTube</i></p>
 
 ---
 
 ## Model Performance
 
-The plugin relies on a pruned and quantised ONNX model to achieve real-time inference with incredibly low latency (~0.2 - 0.3 ms per buffer).
+The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time inference with incredibly low latency (~0.2 - 0.3 ms per buffer).
 
 <p align="center">
   <img src="images/AI_Inference.png" alt="AI_Inference" width="500">
