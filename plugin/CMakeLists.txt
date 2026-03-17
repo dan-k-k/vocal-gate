@@ -2,7 +2,14 @@
 # cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 # cmake --build builds/macOS --config Release --parallel 4
 cmake_minimum_required(VERSION 3.15)
-project(VocalGate VERSION 1.0.0)
+
+if(DEFINED ENV{CI_VERSION})
+    project(VocalGate VERSION $ENV{CI_VERSION})
+    message(STATUS "Building CI Version: ${PROJECT_VERSION}")
+else()
+    project(VocalGate VERSION 1.0.0) # FALLBACK
+    message(STATUS "Building Local Version: ${PROJECT_VERSION}")
+endif()
 
 # Fetch JUCE
 include(FetchContent)

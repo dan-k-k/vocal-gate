@@ -1,6 +1,8 @@
 ; installer.iss
 #define MyAppName "Vocal Gate"
-#define MyAppVersion "1.0.0"
+#ifndef MyAppVersion
+#define MyAppVersion "1.0.0" ; FALLBACK 
+#endif
 #define MyAppPublisher "DanK"
 
 [Setup]

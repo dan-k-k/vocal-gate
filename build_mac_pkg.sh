@@ -1,7 +1,8 @@
 #!/bin/bash
 # build_mac_pkg.sh
 
-echo "Building macOS .pkg Installer..."
+VERSION=${1:-1.0.0} # FALLBACK
+echo "Building macOS .pkg Installer for version $VERSION..."
 
 # Mimicthe root of a Mac HD
 mkdir -p Payload/Library/Audio/Plug-Ins/VST3
@@ -14,7 +15,7 @@ cp -R "build/VocalGate_artefacts/Release/AU/Vocal Gate.component" "Payload/Libra
 # pkgbuild tool
 pkgbuild --root Payload \
          --identifier com.dank.vocalgate \
-         --version 1.0.0 \
+         --version $VERSION \
          --install-location "/" \
          VocalGate_Mac_Installer.pkg
 

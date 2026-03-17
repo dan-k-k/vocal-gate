@@ -11,7 +11,6 @@ jobs:
   build-windows:
     name: Build Windows VST3 Installer
     runs-on: windows-latest
-    # Skip if it's a -mac tag.
     if: "!contains(github.ref, '-mac')"
 
     steps:
@@ -19,6 +18,13 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - name: Extract Version from Tag
+      shell: bash
+      run: |
+        TAG_NAME=${{ github.ref_name }}
+        VERSION=${TAG_NAME#v}
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     # Prepare dependencies
     - name: Download Windows ONNX Runtime
@@ -32,7 +38,10 @@ jobs:
 
     # Compile cpp
     - name: Configure CMake
-      run: cmake -B build -S plugin
+      shell: bash
+      run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
+      env:
+        CI_VERSION: ${{ env.VERSION }}
 
     - name: Build VST3
       run: cmake --build build --config Release --target VocalGate_VST3 --parallel 4
@@ -43,7 +52,7 @@ jobs:
       run: curl -L "https://aka.ms/vs/17/release/vc_redist.x64.exe" -o vc_redist.x64.exe
 
     - name: Compile Inno Setup Installer
-      run: iscc installer.iss
+      run: iscc /DMyAppVersion="${{ env.VERSION }}" installer.iss
 
     # Upload workflow artifact
     - name: Upload Windows Installer Artifact
@@ -75,6 +84,13 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Extract Version from Tag
+      shell: bash
+      run: |
+        TAG_NAME=${{ github.ref_name }}
+        VERSION=${TAG_NAME#v}
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
     # Prepare dependencies
     - name: Download Mac ONNX Runtime (Apple Silicon Only)
       run: |
@@ -91,7 +107,10 @@ jobs:
 
     # Compile cpp
     - name: Configure CMake
+      shell: bash
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64" -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
+      env:
+        CI_VERSION: ${{ env.VERSION }}
 
     - name: Build Plugins (VST3 & AU)
       run: cmake --build build --config Release --parallel 4
@@ -100,7 +119,7 @@ jobs:
     - name: Compile Mac .pkg Installer
       run: |
         chmod +x build_mac_pkg.sh
-        ./build_mac_pkg.sh
+        ./build_mac_pkg.sh ${{ env.VERSION }}
 
     # Upload asset
     - name: Upload Mac Installer
