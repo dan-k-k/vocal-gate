@@ -29,7 +29,7 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
         
         // APVTS attachment
         attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            audioProcessor.apvts, paramID, slider);
+            audioProcessor.parameterManager.apvts, paramID, slider);
 
         label.setText(text, juce::dontSendNotification);
         label.attachToComponent(&slider, false);
@@ -65,16 +65,14 @@ VocalGateEditor::~VocalGateEditor()
 
 void VocalGateEditor::timerCallback()
 {
-    // Raw audio levels
-    inputHistory[writeIndex]  = audioProcessor.inputLevel.load();
-    outputHistory[writeIndex] = audioProcessor.outputLevel.load();
-
-    float rawProb = audioProcessor.gateProbability.load(); // Smoothed
+    // UPDATE HERE: Use the clean, real-time safe getters
+    inputHistory[writeIndex]  = audioProcessor.getInputLevel();
+    outputHistory[writeIndex] = audioProcessor.getOutputLevel();
+    float rawProb             = audioProcessor.getGateProbability(); 
     
     size_t prevIndex = (writeIndex + historySize - 1) % historySize;
     float prevProb = probHistory[prevIndex];
     
-    // 0.0f = responsive but choppy, 1.0f = smooth but slow
     float smoothAmount = 0.6f; 
     probHistory[writeIndex] = (rawProb * (1.0f - smoothAmount)) + (prevProb * smoothAmount);
     writeIndex = (writeIndex + 1) % historySize;

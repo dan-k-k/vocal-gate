@@ -48,6 +48,15 @@ target_sources(VocalGate
     PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
+        
+        # New Refactored Modules
+        Source/ParameterManager.cpp
+        Source/GateDSP.cpp
+        Source/BackgroundMLThread.cpp
+        Source/FeatureExtractor.cpp
+        Source/InferenceEngine.cpp
+        
+        # Existing Headers
         Source/AudioFIFO.h
         Source/DSPConstants.h
 )
