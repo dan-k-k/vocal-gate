@@ -1,7 +1,6 @@
 ## Vocal Gate VST3/AU/Standalone
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. 
-For M-series Macs, macOS 11+ | Windows 10+ 
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
@@ -16,6 +15,8 @@ For M-series Macs, macOS 11+ | Windows 10+
     <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge&logo=windows" alt="Download for Windows">
   </a>
 </p>
+
+For M-series Macs, macOS 11+ | Windows 10+ 
 
 *Note: This installer is unsigned. You must right-click open the installer on macOS | press 'More info' and 'Run anyway' on Windows.*
 
