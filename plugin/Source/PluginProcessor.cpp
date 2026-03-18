@@ -36,6 +36,9 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     
     dspCore.prepare(spec, dawSamplesPerHop);
     mlThread.prepare(sampleRate, dawSamplesPerHop, parameterManager);
+    
+    // <--- 1. Prepare the tracker with sample rate and block size
+    inputVolumeTracker.prepare(sampleRate, samplesPerBlock);
 
     // 3. Report our lookahead latency to the DAW (Ableton, Logic, etc.)
     setLatencySamples(dspCore.getLookaheadSamples());
@@ -61,12 +64,13 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     juce::dsp::ProcessContextReplacing<float> context (audioBlock);
     inputGainModule.process(context);
 
+    // <--- 2. Process tracker immediately after input gain, before DSP/ML
+    inputVolumeTracker.processBlock(buffer);
+
     const float* leftChannelIn = buffer.getReadPointer(0);
 
     // 2. Route Audio to the Machine Learning Thread
-    // Tell the ML thread what mode we are in so it doesn't steal FIFO data during an offline bounce.
     mlThread.setOfflineMode(isNonRealtime());
-    // Always push incoming audio into the FIFO accumulator
     mlThread.pushAudio(leftChannelIn, numSamples);
 
     if (isNonRealtime()) 

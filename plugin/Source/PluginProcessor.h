@@ -1,12 +1,13 @@
 // plugin/Source/PluginProcessor.h
 #pragma once
 
-#include <juce_audio_processors/juce_audio_processors.h>
 #include "ParameterManager.h"
 #include "GateDSP.h"
 #include "BackgroundMLThread.h"
+#include "EmaRmsTracker.h"
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <vector>
-#include <juce_dsp/juce_dsp.h> // Make sure this is included
+#include <juce_dsp/juce_dsp.h>
 
 class VocalGateProcessor : public juce::AudioProcessor
 {
@@ -48,11 +49,13 @@ public:
     float getInputLevel() const  { return dspCore.getInputLevel(); }
     float getOutputLevel() const { return dspCore.getOutputLevel(); }
     float getGateProbability() const { return dspCore.getGateProbability(); }
+    float getDbDifferenceFromTarget() const { return inputVolumeTracker.getDbDifferenceFromTarget(); }
 
 private:
     // Core Modules
     GateDSP dspCore;
     BackgroundMLThread mlThread;
+    EmaRmsTracker inputVolumeTracker; // <--- 3. Instantiate tracker
 
     int dawSamplesPerHop = 0;
     std::vector<float> offlineHopBuffer;

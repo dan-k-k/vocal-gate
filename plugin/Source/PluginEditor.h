@@ -52,11 +52,15 @@ private:
     VocalGateProcessor& audioProcessor;
     CustomKnobLookAndFeel customKnobLookAndFeel;
     
+    juce::TooltipWindow tooltipWindow;
     juce::Font titleFont; 
 
     juce::Slider inputGainSlider;
     juce::Label inputGainLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> inputGainAttachment;
+
+    juce::Label inputLevelMeterLabel; 
+    juce::TextButton matchButton; // <--- ADD THIS HERE
 
     juce::Slider thresholdSlider;
     juce::Label thresholdLabel;
