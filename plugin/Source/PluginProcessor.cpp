@@ -57,23 +57,36 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     // -----------------------------------------------------------------------
     if (isNonRealtime()) 
     {
-        // Offline rendering: Block the thread and process synchronously
-        // Note: You would adapt mlThread to expose a synchronous push/pop for offline processing
-        // For brevity, assuming mlThread has a blocking processOffline block here:
         int processed = 0;
-        while (processed < numSamples) {
+        while (processed < numSamples) 
+        {
             int chunk = std::min(dawSamplesPerHop, numSamples - processed);
-            mlThread.processOfflineBlock(leftChannelIn + processed, parameterManager);
+
+            if (chunk == dawSamplesPerHop) 
+            {
+                // Fast path: We have exactly enough samples for a full hop
+                mlThread.processOfflineBlock(leftChannelIn + processed, parameterManager);
+            } 
+            else 
+            {
+                // Edge case: The final chunk of the render is smaller than our hop size.
+                // Copy what we have, zero-pad the rest, and process safely.
+                std::fill(offlineHopBuffer.begin(), offlineHopBuffer.end(), 0.0f);
+                std::copy(leftChannelIn + processed, leftChannelIn + processed + chunk, offlineHopBuffer.begin());
+                
+                mlThread.processOfflineBlock(offlineHopBuffer.data(), parameterManager);
+            }
             processed += chunk;
         }
     }
     else 
     {
-        // Realtime rendering: Push to the lock-free FIFO and wake the ML thread
+        // Realtime rendering: Push to the lock-free FIFO
         mlThread.pushAudio(leftChannelIn, numSamples);
         
-        // If we've pushed enough for a new hop, notify the thread
-        if (numSamples >= dawSamplesPerHop) {
+        // Wake the ML thread ONLY if the FIFO has accumulated a full hop's worth of data
+        if (mlThread.getNumReadySamples() >= dawSamplesPerHop) 
+        {
             mlThread.notifyDataReady(); 
         }
     }
@@ -106,9 +119,7 @@ void VocalGateProcessor::setStateInformation (const void* data, int sizeInBytes)
 
 juce::AudioProcessorEditor* VocalGateProcessor::createEditor()
 {
-    // Return your UI here. It will connect to `this->parameterManager.apvts`
-    // return new VocalGateEditor (*this); 
-    return nullptr; // Temporary until you link your editor
+    return new VocalGateEditor (*this); 
 }
 
 // -----------------------------------------------------------------------

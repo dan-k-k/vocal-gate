@@ -1,6 +1,6 @@
 # plugin/CMakeLists.txt
-# cmake -B builds/macOS -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64"
-# cmake --build builds/macOS --config Release --parallel 4
+# cmake -B build -DCMAKE_BUILD_TYPE=Release
+# cmake --build build --config Release --parallel 4
 
 # rm -rf ~/Library/Caches/AudioUnitCache/* 
 # sudo rm -rf /Library/Caches/AudioUnitCache/*

@@ -5,6 +5,7 @@
 #include "ParameterManager.h"
 #include "GateDSP.h"
 #include "BackgroundMLThread.h"
+#include <vector>
 
 class VocalGateProcessor : public juce::AudioProcessor
 {

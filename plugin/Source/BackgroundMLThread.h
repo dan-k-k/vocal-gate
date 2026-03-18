@@ -33,6 +33,11 @@ public:
     // Offline rendering bypass
     void processOfflineBlock(const float* data, const ParameterManager& params);
 
+    // Used by the audio thread to check if a full hop is ready
+    int getNumReadySamples() const { 
+        return (audioFifo != nullptr) ? audioFifo->getNumReady() : 0; 
+    }
+
 private:
     void processMLHop(const float* hopData, const ParameterManager& params);
     float pushAndAveragePrediction(float rawProb, float smoothMs);

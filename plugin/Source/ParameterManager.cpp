@@ -49,7 +49,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ParameterManager::createPara
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"probsmoothing", 1}, "Smooth", probSmoothRange, 400.0f));
 
-    return { std::move(params) };
+    return { std::make_move_iterator(params.begin()), std::make_move_iterator(params.end()) };
 }
 
 void ParameterManager::saveState(juce::MemoryBlock& destData)
