@@ -9,7 +9,7 @@ DATA_DIR = "./data"
 
 print("Loading VocalGate dataset...")
 
-# 1. Define the exact same Log Mel Transform used in train.py
+# Same Log Mel Transform used in train.py
 log_mel_transform = nn.Sequential(
     T.MelSpectrogram(
         sample_rate=16000,
@@ -22,13 +22,8 @@ log_mel_transform = nn.Sequential(
     T.AmplitudeToDB(stype='power', top_db=80.0)
 )
 
-# 2. Initialize the dataset WITHOUT the transform argument
 dataset = VocalGateDataset(split_dir=os.path.join(DATA_DIR, "train"), augment=False)
-
-# 3. Grab the first item (which is now raw audio!)
 raw_waveform, label = dataset[0]
-
-# 4. Apply the transform manually to inspect the features
 log_mel_features = log_mel_transform(raw_waveform)
 
 print(f"Label: {label.item()} (1.0 = artifact, 0.0 = vocal)")

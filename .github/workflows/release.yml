@@ -115,11 +115,9 @@ jobs:
         mkdir -p plugin/onnxruntime/lib
         mkdir -p plugin/onnxruntime/include
         
-        # Grab the ARM64 specific binary (Notice the URL change here!)
         curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-osx-arm64-1.24.2.tgz" -o onnx_mac.tgz
         tar -xzf onnx_mac.tgz
         
-        # Copy the arm64 dylib and headers
         cp onnxruntime-osx-arm64-1.24.2/lib/libonnxruntime.1.24.2.dylib plugin/onnxruntime/lib/
         cp -R onnxruntime-osx-arm64-1.24.2/include/* plugin/onnxruntime/include/
 

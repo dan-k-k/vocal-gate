@@ -19,7 +19,7 @@ def export_to_onnx():
     os.makedirs(plugin_dir, exist_ok=True)
 
     fp32_onnx_path = os.path.join(plugin_dir, "vocalgate_fp32.onnx")
-    preprocessed_onnx_path = os.path.join(plugin_dir, "vocalgate_fp32_prep.onnx") # for preprocessing
+    preprocessed_onnx_path = os.path.join(plugin_dir, "vocalgate_fp32_prep.onnx") # For preprocessing
     int8_onnx_path = os.path.join(plugin_dir, "vocalgate_int8.onnx")
     
     if not os.path.exists(weights_path):
@@ -62,7 +62,7 @@ def export_to_onnx():
         save_as_external_data=False
     )
 
-    print("Pre-processing Complete. Starting ONNX INT8 Quantization...")
+    print("Pre-processing complete. Starting ONNX INT8 quantisation...")
 
     # Use pre-processed model for final quantisation
     quantize_dynamic(
@@ -77,10 +77,10 @@ def export_to_onnx():
     size_int8 = print_size_of_model(int8_onnx_path)
     compression = (1 - (size_int8 / size_fp32)) * 100
 
-    print(f"Raw PyTorch Size {size_pt:.2f} KB")
-    print(f"ONNX FP32 Size: {size_fp32:.2f} KB")
-    print(f"ONNX INT8 Size: {size_int8:.2f} KB")
-    print(f"{compression:.1f}% smaller!")
+    print(f"Raw PyTorch size {size_pt:.2f} KB")
+    print(f"ONNX FP32 size: {size_fp32:.2f} KB")
+    print(f"ONNX INT8 size: {size_int8:.2f} KB")
+    print(f"{compression:.1f}% smaller.")
     print(f"\nSaved to: '{int8_onnx_path}'")
 
     if os.path.exists(preprocessed_onnx_path):

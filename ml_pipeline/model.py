@@ -19,22 +19,21 @@ class DepthwiseSeparableConv(nn.Module):
 
 class VocalGateModel(nn.Module):
     def __init__(self, input_shape=(1, 40, 61), num_classes=1):
-        """input_shape: (Channels, Mel_Bins, Time_Frames). 
-        (1, 40, 61) corresponds to 1 sec of 16kHz audio with hop_length=256 and 40 Mels."""
+        """input_shape: (Channels, Mel_Bins, Time_Frames): (1, 40, 61) corresponds to 1 sec of 16kHz audio with hop_length=256 and 40 Mels."""
         super(VocalGateModel, self).__init__()
         
         self.conv_layers = nn.Sequential(
-            # Layer 1
+            # L1
             nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(8),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2), 
 
-            # Layer 2
+            # L2
             DepthwiseSeparableConv(in_channels=8, out_channels=16),
             nn.MaxPool2d(kernel_size=2, stride=2),
             
-            # Layer 3
+            # L3
             DepthwiseSeparableConv(in_channels=16, out_channels=32),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )

@@ -62,7 +62,7 @@ def gather_and_split_data():
             if file.endswith('.wav'):
                 data_dict[split_target]['speech'].append(os.path.join(root, file))
 
-    # ESC-50 ---
+    # ESC-50 
     print(f"Routing ESC-50 (official labels: train, val, test)...")
     esc50_csv = os.path.join(ESC50_DIR, "meta", "esc50.csv")
     esc50_audio = os.path.join(ESC50_DIR, "audio")

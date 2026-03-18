@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from dataset import VocalGateDataset
 from model import VocalGateModel
-from train import process_batch # Reusing your existing logic!
+from train import process_batch
 
 def apply_pruning(model, amount=0.2):
     print(f"Pruning {amount*100}% of the smallest weights...")
@@ -33,7 +33,7 @@ def make_pruning_permanent(parameters_to_prune):
 
 def main():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    print(f"Starting... on: {device}")
+    print(f"Starting on: {device}...")
 
     weights_path = "./models/vocalgate_best.pt"
     pruned_save_path = "./models/vocalgate_pruned.pt"
@@ -67,7 +67,7 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-4) # Much smaller lr
+    optimizer = optim.Adam(model.parameters(), lr=1e-4) # Much smaller learning rate
 
     epochs = 5 
     model.train()
