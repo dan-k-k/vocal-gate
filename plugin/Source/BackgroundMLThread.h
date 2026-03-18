@@ -65,7 +65,8 @@ private:
     int predictionWriteIndex = 0;
 
     // Transient Pad State
-    int hopsForHalfSecond = 0;
+    int padDurationHops = 0;
+    int armingHops = 0;
     int consecutiveSilentHops = 0;
     int padActiveHopsRemaining = 0;
 

@@ -37,10 +37,12 @@ void BackgroundMLThread::prepare(double sampleRate, int samplesPerHop, const Par
     predictionWriteIndex = 0;
     mlDataReady.store(false);
 
-    // Prevent divide-by-zero just in case, and calculate how many hops make up 0.5s
+    double padDurationSeconds = 1.0; // To completely fill the ends of the spectrogram
+    double armingSeconds = 0.3;      // How much silence is needed to re-arm
     int safeSamplesPerHop = std::max(1, samplesPerHop); 
-    hopsForHalfSecond = static_cast<int>(std::ceil((0.5 * sampleRate) / safeSamplesPerHop));
-    consecutiveSilentHops = 0;
+    padDurationHops = static_cast<int>(std::ceil((padDurationSeconds * sampleRate) / safeSamplesPerHop));
+    armingHops = static_cast<int>(std::ceil((armingSeconds * sampleRate) / safeSamplesPerHop));
+    consecutiveSilentHops = padDurationHops; 
     padActiveHopsRemaining = 0;
 
     featureExtractor->prepare(sampleRate, samplesPerHop);
@@ -140,48 +142,47 @@ void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManag
     bool isSilent = (peakLevel < silenceThreshold);
     float rawProb = 0.0f;
 
+    // ------------------------------------------------------------------
+    // THE FIX: ALWAYS EXTRACT FEATURES!
+    // This ensures the rolling spectrogram buffer is always filling up 
+    // with real audio, even while we are bypassing the ML inference.
+    // ------------------------------------------------------------------
+    auto features = featureExtractor->process(hopData);
+
     // 2. Transient Pad Logic & Inference
     if (isSilent) 
     {
-        // Increment our silence counter to potentially "arm" the pad
         consecutiveSilentHops++;
         
-        // If the pad was currently firing but the audio immediately died, 
-        // we still count down the timer. 
         if (padActiveHopsRemaining > 0) {
             padActiveHopsRemaining--;
         }
-        
-        // rawProb remains 0.0f (bypassing ML because it's silent)
+        // rawProb remains 0.0f
     } 
     else 
     {
-        // Audio broke the threshold! Check if the pad was armed.
-        if (consecutiveSilentHops >= hopsForHalfSecond) {
-            // Trigger the pad!
-            padActiveHopsRemaining = hopsForHalfSecond;
+        // Check against the 0.3s arming requirement, NOT the 1.0s pad duration!
+        if (consecutiveSilentHops >= armingHops) {
+            padActiveHopsRemaining = padDurationHops;
         }
         
-        // Reset the silence counter because we have audio
         consecutiveSilentHops = 0;
 
-        // Determine whether to run ML or bypass
         if (padActiveHopsRemaining > 0) 
         {
-            // BYPASS: Pad is active. Force rawProb to 0.0f to keep the gate open.
+            // BYPASS INFERENCE ONLY: Force rawProb to 0.0f
             rawProb = 0.0f;
             padActiveHopsRemaining--;
         } 
         else 
         {
-            // NORMAL: Extract Features and Run Inference
-            auto features = featureExtractor->process(hopData);
+            // RUN INFERENCE: The model now receives a fully populated, 
+            // natural-looking spectrogram!
             rawProb = inferenceEngine->run(features);
         }
     }
 
-    // 3. Smooth the prediction (This continues to run even during bypass 
-    // to ensure a smooth transition when handing control back to ONNX)
+    // 3. Smooth the prediction
     float smoothedProb = pushAndAveragePrediction(rawProb, params.getProbSmoothing());
     
     // 4. Write back to the Probability Ring Buffer
