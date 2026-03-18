@@ -1,6 +1,6 @@
 ## Vocal Gate VST3 & AU
 
-An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. 
+An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts (coughing, sneezing, etc.) and background noise. 
 
 This plugin is intended for Creators and Editors (Podcasts, Youtube, etc.) who need an easy, accurate filter. 
 
