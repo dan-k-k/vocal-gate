@@ -2,7 +2,7 @@
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. 
 
-This plugin is intended for Creators and Editors (Podcast, Youtube, etc.) who need an easy, accurate filter. 
+This plugin is intended for Creators and Editors (Podcasts, Youtube, etc.) who need an easy, accurate filter. 
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
