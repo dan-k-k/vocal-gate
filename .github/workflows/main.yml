@@ -48,6 +48,11 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive 
+        
+    - name: Fetch Secret ONNX Model
+      uses: ./.github/actions/fetch-onnx
+      with:
+        pat_token: ${{ secrets.MODEL_REPO_PAT }}
 
     - name: Configure CMake
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
@@ -69,6 +74,11 @@ jobs:
       with:
         submodules: recursive 
     
+    - name: Fetch Secret ONNX Model
+      uses: ./.github/actions/fetch-onnx
+      with:
+        pat_token: ${{ secrets.MODEL_REPO_PAT }}
+        
     - name: Configure CMake
       run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
 
@@ -98,6 +108,11 @@ jobs:
       with:
         submodules: recursive 
 
+    - name: Fetch Secret ONNX Model
+      uses: ./.github/actions/fetch-onnx
+      with:
+        pat_token: ${{ secrets.MODEL_REPO_PAT }}
+    
     - name: Download Windows ONNX Runtime
       shell: bash
       run: |

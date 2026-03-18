@@ -1,0 +1,24 @@
+# .github/actions/fetch-onnx/action.yml
+name: 'Fetch Private ONNX Model'
+description: 'Downloads the ONNX model from a private repository'
+inputs:
+  pat_token:
+    description: 'Personal Access Token with read access to the private repo'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download Private ONNX Model
+      uses: actions/checkout@v4
+      with:
+        repository: dan-k-k/vocal-gate-onnx
+        token: ${{ inputs.pat_token }}
+        path: secret_model_dir
+
+    - name: Move ONNX into Plugin Source
+      shell: bash
+      run: |
+        mv secret_model_dir/vocalgate_int8.onnx plugin/vocalgate_int8.onnx
+        rm -rf secret_model_dir
+

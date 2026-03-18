@@ -19,18 +19,10 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Download Private ONNX Model
-      uses: actions/checkout@v4
+    - name: Fetch Secret ONNX Model
+      uses: ./.github/actions/fetch-onnx
       with:
-        repository: dan-k-k/vocal-gate-onnx
-        token: ${{ secrets.MODEL_REPO_PAT }}
-        path: secret_model_dir
-
-    - name: Move ONNX into Plugin Source
-      shell: bash
-      run: |
-        mv secret_model_dir/vocalgate_int8.onnx plugin/vocalgate_int8.onnx
-        rm -rf secret_model_dir
+        pat_token: ${{ secrets.MODEL_REPO_PAT }}
 
     - name: Extract Version from Tag
       shell: bash
@@ -101,18 +93,10 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Download Private ONNX Model
-      uses: actions/checkout@v4
+    - name: Fetch Secret ONNX Model
+      uses: ./.github/actions/fetch-onnx
       with:
-        repository: dan-k-k/vocal-gate-onnx
-        token: ${{ secrets.MODEL_REPO_PAT }}
-        path: secret_model_dir
-
-    - name: Move ONNX into Plugin Source
-      shell: bash
-      run: |
-        mv secret_model_dir/vocalgate_int8.onnx plugin/vocalgate_int8.onnx
-        rm -rf secret_model_dir
+        pat_token: ${{ secrets.MODEL_REPO_PAT }}
 
     - name: Extract Version from Tag
       shell: bash
