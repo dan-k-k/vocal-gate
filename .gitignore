@@ -26,7 +26,7 @@ ml_pipeline/data/
 *.pt
 *.pth
 *.onnx
-!plugin/vocalgate_int8.onnx
+# !plugin/vocalgate_int8.onnx # NOW A GITHUB SECRET
 !plugin/FredokaOne.ttf
 *.onnx.data
 ml_pipeline/models/
