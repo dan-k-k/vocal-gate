@@ -37,7 +37,7 @@ This plugin is intended for Creators and Editors (Podcast, Youtube, etc.) who ne
 
 ## Model Performance
 
-The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time inference with incredibly low latency (~0.2 - 0.3 ms per buffer). The plugin reports 750ms of latency to build the spectrogram for inference. 
+The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time inference in just ~0.3 ms per buffer. 
 
 <p align="center">
   <img src="images/AI_Inference.png" alt="AI_Inference" width="500">
