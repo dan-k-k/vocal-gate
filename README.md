@@ -21,9 +21,8 @@ This plugin is intended for Creators and Editors (Podcast, Youtube, etc.) who ne
 <p align="center">
   <small><b>Requires:</b> macOS 11+ (M-series) &nbsp;|&nbsp; Windows 10+ (64-bit)</small><br>
   <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i>
+  <small><i>Note: This installer is unsigned. On macOS, right-click open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'.</small></i>
 </p>
-
-*Note: This installer is unsigned*. On macOS, right-click open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'.
 
 ### Real-World Use Examples
 
