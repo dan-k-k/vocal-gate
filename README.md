@@ -2,17 +2,19 @@
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts and background noise. 
 
+This plugin is intended for Creators (Podcasts, Youtube videos) who need a quick and accurate filter. 
+
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
 </p>
 
 <p align="center">
-  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Mac_Installer.pkg">
-    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.1-black?style=for-the-badge" alt="Download for macOS">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.3/VocalGate_Mac_Installer.pkg">
+    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.3-black?style=for-the-badge" alt="Download for macOS">
   </a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.1/VocalGate_Windows_Installer.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.1-blue?style=for-the-badge" alt="Download for Windows">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.3/VocalGate_Windows_Installer.exe">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.3-blue?style=for-the-badge" alt="Download for Windows">
   </a>
 </p>
 
@@ -36,7 +38,7 @@ An AI-powered noise gate plugin specifically trained to separate clean speech fr
 
 ## Model Performance
 
-The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time inference with incredibly low latency (~0.2 - 0.3 ms per buffer).
+The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time inference with incredibly low latency (~0.2 - 0.3 ms per buffer). The plugin reports 750ms of latency to build the spectrogram for inference. 
 
 <p align="center">
   <img src="images/AI_Inference.png" alt="AI_Inference" width="500">
