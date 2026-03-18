@@ -54,6 +54,10 @@ private:
     
     juce::Font titleFont; 
 
+    juce::Slider inputGainSlider;
+    juce::Label inputGainLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> inputGainAttachment;
+
     juce::Slider thresholdSlider;
     juce::Label thresholdLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;

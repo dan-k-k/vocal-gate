@@ -54,51 +54,32 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     juce::ScopedNoDenormals noDenormals;
     int numSamples = buffer.getNumSamples();
 
-    // -----------------------------------------------------------------------
-    // NEW: Apply Smoothed Input Gain FIRST
-    // -----------------------------------------------------------------------
+    // 1. Apply Smoothed Input Gain FIRST
     inputGainModule.setGainDecibels(parameterManager.getInputGain());
     
     juce::dsp::AudioBlock<float> audioBlock (buffer);
     juce::dsp::ProcessContextReplacing<float> context (audioBlock);
     inputGainModule.process(context);
 
-    // Now grab the read pointer AFTER the gain has been applied
     const float* leftChannelIn = buffer.getReadPointer(0);
 
-    // -----------------------------------------------------------------------
-    // 1. Route Audio to the Machine Learning Thread
-    // -----------------------------------------------------------------------
+    // 2. Route Audio to the Machine Learning Thread
+    // Tell the ML thread what mode we are in so it doesn't steal FIFO data during an offline bounce.
+    mlThread.setOfflineMode(isNonRealtime());
+    // Always push incoming audio into the FIFO accumulator
+    mlThread.pushAudio(leftChannelIn, numSamples);
+
     if (isNonRealtime()) 
     {
-        int processed = 0;
-        while (processed < numSamples) 
+        // Offline rendering: Synchronously pop and process hops on the main thread
+        while (mlThread.getNumReadySamples() >= dawSamplesPerHop) 
         {
-            int chunk = std::min(dawSamplesPerHop, numSamples - processed);
-
-            if (chunk == dawSamplesPerHop) 
-            {
-                // Fast path: We have exactly enough samples for a full hop
-                mlThread.processOfflineBlock(leftChannelIn + processed, parameterManager);
-            } 
-            else 
-            {
-                // Edge case: The final chunk of the render is smaller than our hop size.
-                // Copy what we have, zero-pad the rest, and process safely.
-                std::fill(offlineHopBuffer.begin(), offlineHopBuffer.end(), 0.0f);
-                std::copy(leftChannelIn + processed, leftChannelIn + processed + chunk, offlineHopBuffer.begin());
-                
-                mlThread.processOfflineBlock(offlineHopBuffer.data(), parameterManager);
-            }
-            processed += chunk;
+            mlThread.processNextOfflineHop(parameterManager);
         }
     }
     else 
     {
-        // Realtime rendering: Push to the lock-free FIFO
-        mlThread.pushAudio(leftChannelIn, numSamples);
-        
-        // Wake the ML thread ONLY if the FIFO has accumulated a full hop's worth of data
+        // Realtime rendering: Wake the background thread ONLY if we have enough data
         if (mlThread.getNumReadySamples() >= dawSamplesPerHop) 
         {
             mlThread.notifyDataReady(); 
@@ -106,10 +87,8 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     }
 
     // -----------------------------------------------------------------------
-    // 2. Apply DSP (Delay Line & Gate Envelope)
+    // DSP Processing
     // -----------------------------------------------------------------------
-    // We pass the parameter manager so DSP can read the latest threshold/attack/etc.
-    // We pass the ML thread's ring buffer so DSP knows when to open/close the gate.
     dspCore.process(buffer, parameterManager, mlThread.getProbRingBuffer(), mlThread.getProbBufferSize());
 }
 

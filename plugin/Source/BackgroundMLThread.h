@@ -30,10 +30,10 @@ public:
     void pushAudio(const float* data, int numSamples);
     void notifyDataReady();
     
-    // Offline rendering bypass
-    void processOfflineBlock(const float* data, const ParameterManager& params);
+    // NEW: Offline rendering methods
+    void setOfflineMode(bool offline); 
+    void processNextOfflineHop(const ParameterManager& params);
 
-    // Used by the audio thread to check if a full hop is ready
     int getNumReadySamples() const { 
         return (audioFifo != nullptr) ? audioFifo->getNumReady() : 0; 
     }
@@ -44,7 +44,7 @@ private:
 
     // Thread synchronization
     std::atomic<bool> mlDataReady { false };
-    bool isOffline = false;
+    std::atomic<bool> isOffline { false }; // Make this atomic for thread safety
 
     // Sub-modules (Owned by this thread)
     std::unique_ptr<FeatureExtractor> featureExtractor;

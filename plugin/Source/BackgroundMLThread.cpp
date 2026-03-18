@@ -67,6 +67,11 @@ void BackgroundMLThread::notifyDataReady()
     mlDataReady.store(true, std::memory_order_release);
 }
 
+void BackgroundMLThread::setOfflineMode(bool offline)
+{
+    isOffline.store(offline, std::memory_order_relaxed);
+}
+
 // -----------------------------------------------------------------------------
 // THREAD LOOP
 // -----------------------------------------------------------------------------
@@ -77,9 +82,11 @@ void BackgroundMLThread::run()
 
     while (!threadShouldExit())
     {
-        // Wait until there is enough data in the FIFO, or we are signaled
-        if (mlDataReady.load(std::memory_order_acquire) || 
-           (audioFifo != nullptr && audioFifo->getNumReady() >= hopSize))
+        // Prevent the background thread from draining the FIFO during an offline bounce
+        bool offline = isOffline.load(std::memory_order_relaxed);
+
+        if (!offline && (mlDataReady.load(std::memory_order_acquire) || 
+           (audioFifo != nullptr && audioFifo->getNumReady() >= hopSize)))
         {
             // Drain the FIFO in hop-sized chunks
             while (audioFifo != nullptr && audioFifo->getNumReady() >= hopSize && !threadShouldExit())
@@ -100,10 +107,17 @@ void BackgroundMLThread::run()
 // CORE ML PIPELINE
 // -----------------------------------------------------------------------------
 
-void BackgroundMLThread::processOfflineBlock(const float* data, const ParameterManager& params)
+void BackgroundMLThread::processNextOfflineHop(const ParameterManager& params)
 {
-    isOffline = true;
-    processMLHop(data, params);
+    int hopSize = static_cast<int>(dawHopBuffer.size());
+    
+    if (audioFifo != nullptr && audioFifo->getNumReady() >= hopSize)
+    {
+        // Safe to use dawHopBuffer here because the background run() loop 
+        // ignores the FIFO when isOffline is true.
+        audioFifo->pop(dawHopBuffer.data(), hopSize);
+        processMLHop(dawHopBuffer.data(), params);
+    }
 }
 
 void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManager& params)

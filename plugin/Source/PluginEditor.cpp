@@ -38,13 +38,20 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
         addAndMakeVisible(label);
     };
 
-    juce::Colour detectionColor = juce::Colours::darkorange;
-    juce::Colour envelopeColor = juce::Colour::fromRGB(40, 210, 180);
+    // UI Color Palette
+    juce::Colour utilityColor   = juce::Colour::fromRGB(220, 80, 150); // Magenta for Global IO
+    juce::Colour detectionColor = juce::Colours::darkorange;           // Orange for ML
+    juce::Colour envelopeColor  = juce::Colour::fromRGB(40, 210, 180); // Blue for DSP
 
+    // 1. Utility (Far Left)
+    setupKnob(inputGainSlider, inputGainLabel, "Input", " dB", "input_gain", inputGainAttachment, utilityColor);
+
+    // 2. Detection Group
     setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", "threshold", thresholdAttachment, detectionColor);
     setupKnob(probSmoothSlider, probSmoothLabel, "Smooth", " ms", "probsmoothing", probSmoothAttachment, detectionColor);
     setupKnob(shiftSlider, shiftLabel, "Shift", " ms", "shift", shiftAttachment, detectionColor);
 
+    // 3. Envelope Group
     setupKnob(floorSlider, floorLabel, "Floor", " dB", "floor", floorAttachment, envelopeColor);
     setupKnob(attackSlider, attackLabel, "Attack", " ms", "attack", attackAttachment, envelopeColor);
     setupKnob(releaseSlider, releaseLabel, "Release", " ms", "release", releaseAttachment, envelopeColor);
@@ -54,7 +61,7 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
 
 VocalGateEditor::~VocalGateEditor() 
 {
-    // Remove before the plugin is destroyed
+    inputGainSlider.setLookAndFeel(nullptr);
     thresholdSlider.setLookAndFeel(nullptr);
     floorSlider.setLookAndFeel(nullptr);
     probSmoothSlider.setLookAndFeel(nullptr); 
@@ -65,7 +72,6 @@ VocalGateEditor::~VocalGateEditor()
 
 void VocalGateEditor::timerCallback()
 {
-    // UPDATE HERE: Use the clean, real-time safe getters
     inputHistory[writeIndex]  = audioProcessor.getInputLevel();
     outputHistory[writeIndex] = audioProcessor.getOutputLevel();
     float rawProb             = audioProcessor.getGateProbability(); 
@@ -101,7 +107,6 @@ void VocalGateEditor::paint (juce::Graphics& g)
     inputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
     outputPath.startNewSubPath(audioArea.getX(), audioArea.getBottom());
 
-    // Visual shift
     float shiftMs = static_cast<float>(shiftSlider.getValue());
     int shiftFrames = static_cast<int>(std::round(shiftMs / (1000.0f / 60.0f)));
 
@@ -158,15 +163,26 @@ void VocalGateEditor::resized()
     int squeezePixels = 40; 
     bottomArea = bottomArea.withTrimmedLeft(squeezePixels).withTrimmedRight(squeezePixels);
     
-    int knobWidth = bottomArea.getWidth() / 6; 
     int shiftDown = 8;
 
-    // Detection (Orange Knobs - Left Side)
+    // 1. UTILITY (Magenta Knob)
+    // We carve out 70 pixels of width to give the text box breathing room.
+    auto inputGainArea = bottomArea.removeFromLeft(70); 
+    
+    // THE TRICK: Set the bounds to (70, 50) instead of (50, 50).
+    // The height of 50 keeps the knob physically small, 
+    // but the width of 70 allows the text to render fully!
+    inputGainSlider.setBounds(inputGainArea.withSizeKeepingCentre(70, 50).translated(0, shiftDown));
+
+    // 2. THE REST (Orange & Blue Knobs)
+    int knobWidth = bottomArea.getWidth() / 6; 
+
+    // Detection 
     thresholdSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     probSmoothSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     shiftSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     
-    // Envelope (Blue Knobs - Right Side)
+    // Envelope 
     floorSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     attackSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
     releaseSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));
