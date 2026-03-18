@@ -64,6 +64,11 @@ private:
     std::array<float, maxPredictionFrames> predictionHistory { 0.0f };
     int predictionWriteIndex = 0;
 
+    // Transient Pad State
+    int hopsForHalfSecond = 0;
+    int consecutiveSilentHops = 0;
+    int padActiveHopsRemaining = 0;
+
     // We store a reference to params safely via a pointer that gets passed in
     const ParameterManager* currentParams = nullptr;
 
