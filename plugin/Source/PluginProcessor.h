@@ -6,6 +6,7 @@
 #include "GateDSP.h"
 #include "BackgroundMLThread.h"
 #include <vector>
+#include <juce_dsp/juce_dsp.h> // Make sure this is included
 
 class VocalGateProcessor : public juce::AudioProcessor
 {
@@ -55,6 +56,7 @@ private:
 
     int dawSamplesPerHop = 0;
     std::vector<float> offlineHopBuffer;
+    juce::dsp::Gain<float> inputGainModule;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VocalGateProcessor)
 };

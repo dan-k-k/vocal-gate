@@ -30,6 +30,9 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     // 2. Prepare our sub-modules
     juce::dsp::ProcessSpec spec { sampleRate, static_cast<uint32_t>(samplesPerBlock), static_cast<uint32_t>(getTotalNumOutputChannels()) };
+
+    inputGainModule.prepare(spec);
+    inputGainModule.setRampDurationSeconds(0.02);
     
     dspCore.prepare(spec, dawSamplesPerHop);
     mlThread.prepare(sampleRate, dawSamplesPerHop, parameterManager);
@@ -50,6 +53,17 @@ void VocalGateProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
     int numSamples = buffer.getNumSamples();
+
+    // -----------------------------------------------------------------------
+    // NEW: Apply Smoothed Input Gain FIRST
+    // -----------------------------------------------------------------------
+    inputGainModule.setGainDecibels(parameterManager.getInputGain());
+    
+    juce::dsp::AudioBlock<float> audioBlock (buffer);
+    juce::dsp::ProcessContextReplacing<float> context (audioBlock);
+    inputGainModule.process(context);
+
+    // Now grab the read pointer AFTER the gain has been applied
     const float* leftChannelIn = buffer.getReadPointer(0);
 
     // -----------------------------------------------------------------------

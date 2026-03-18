@@ -11,6 +11,7 @@ ParameterManager::ParameterManager(juce::AudioProcessor& processor)
     releaseParam       = apvts.getRawParameterValue("release");
     shiftParam         = apvts.getRawParameterValue("shift");
     probSmoothingParam = apvts.getRawParameterValue("probsmoothing");
+    inputGainParam     = apvts.getRawParameterValue("input_gain");
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ParameterManager::createParameterLayout()
@@ -48,6 +49,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout ParameterManager::createPara
     probSmoothRange.setSkewForCentre (400.0f);
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"probsmoothing", 1}, "Smooth", probSmoothRange, 400.0f));
+
+    juce::NormalisableRange<float> gainRange (-12.0f, 12.0f, 0.1f);
+    gainRange.setSkewForCentre (0.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"input_gain", 1}, "Input Gain", gainRange, 0.0f));
 
     return { std::make_move_iterator(params.begin()), std::make_move_iterator(params.end()) };
 }

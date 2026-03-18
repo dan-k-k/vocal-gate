@@ -18,6 +18,7 @@ public:
     float getRelease() const       { return releaseParam->load(std::memory_order_relaxed); }
     float getShift() const         { return shiftParam->load(std::memory_order_relaxed); }
     float getProbSmoothing() const { return probSmoothingParam->load(std::memory_order_relaxed); }
+    float getInputGain() const     { return inputGainParam->load(std::memory_order_relaxed); } // <-- Changed here
 
     // DAW Save/Load State Handling
     void saveState(juce::MemoryBlock& destData);
@@ -34,6 +35,7 @@ private:
     std::atomic<float>* releaseParam   = nullptr;
     std::atomic<float>* shiftParam     = nullptr;
     std::atomic<float>* probSmoothingParam = nullptr;
+    std::atomic<float>* inputGainParam = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ParameterManager)
 };
