@@ -32,7 +32,7 @@ void VocalGateProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     juce::dsp::ProcessSpec spec { sampleRate, static_cast<uint32_t>(samplesPerBlock), static_cast<uint32_t>(getTotalNumOutputChannels()) };
     
     dspCore.prepare(spec, dawSamplesPerHop);
-    mlThread.prepare(sampleRate, dawSamplesPerHop);
+    mlThread.prepare(sampleRate, dawSamplesPerHop, parameterManager);
 
     // 3. Report our lookahead latency to the DAW (Ableton, Logic, etc.)
     setLatencySamples(dspCore.getLookaheadSamples());

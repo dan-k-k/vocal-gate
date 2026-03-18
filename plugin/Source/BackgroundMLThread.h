@@ -15,7 +15,7 @@ public:
     ~BackgroundMLThread() override;
 
     // Lifecycle
-    void prepare(double sampleRate, int samplesPerHop);
+    void prepare(double sampleRate, int samplesPerHop, const ParameterManager& params); // <-- Add the 3rd argument
     void startProcessing();
     void stopProcessing();
 

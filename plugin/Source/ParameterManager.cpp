@@ -49,7 +49,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ParameterManager::createPara
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"probsmoothing", 1}, "Smooth", probSmoothRange, 400.0f));
 
-    return { params.begin(), params.end() };
+    return { std::move(params) };
 }
 
 void ParameterManager::saveState(juce::MemoryBlock& destData)
@@ -67,3 +67,4 @@ void ParameterManager::loadState(const void* data, int sizeInBytes)
     if (xmlState != nullptr && xmlState->hasTagName (apvts.state.getType()))
         apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
+

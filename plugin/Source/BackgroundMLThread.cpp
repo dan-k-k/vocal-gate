@@ -1,13 +1,13 @@
 // plugin/Source/BackgroundMLThread.cpp
 #include "BackgroundMLThread.h"
-// #include "FeatureExtractor.h"  // (To be implemented)
-// #include "InferenceEngine.h"   // (To be implemented)
+#include "FeatureExtractor.h"  // (To be implemented)
+#include "InferenceEngine.h"   // (To be implemented)
 
 BackgroundMLThread::BackgroundMLThread()
     : juce::Thread("ONNX_ML_Thread")
 {
-    // featureExtractor = std::make_unique<FeatureExtractor>();
-    // inferenceEngine = std::make_unique<InferenceEngine>();
+    featureExtractor = std::make_unique<FeatureExtractor>();
+    inferenceEngine = std::make_unique<InferenceEngine>();
 }
 
 BackgroundMLThread::~BackgroundMLThread()
@@ -15,9 +15,10 @@ BackgroundMLThread::~BackgroundMLThread()
     stopProcessing();
 }
 
-void BackgroundMLThread::prepare(double sampleRate, int samplesPerHop)
+void BackgroundMLThread::prepare(double sampleRate, int samplesPerHop, const ParameterManager& params) // <-- Add the 3rd argument
 {
     stopProcessing();
+    currentParams = &params;
 
     // 1. Setup Audio FIFO (2 seconds worth of buffering)
     audioFifo = std::make_unique<AudioFIFO>(static_cast<int>(sampleRate * 2.0));
@@ -36,8 +37,7 @@ void BackgroundMLThread::prepare(double sampleRate, int samplesPerHop)
     predictionWriteIndex = 0;
     mlDataReady.store(false);
 
-    // featureExtractor->prepare(sampleRate);
-    // inferenceEngine->prepare();
+    featureExtractor->prepare(sampleRate, samplesPerHop);
 }
 
 void BackgroundMLThread::startProcessing()
@@ -122,10 +122,10 @@ void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManag
     if (peakLevel >= silenceThreshold) 
     {
         // 2. Extract Features (Audio -> Mel Spectrogram)
-        // const auto& features = featureExtractor->process(hopData, hopSize);
+        auto features = featureExtractor->process(hopData);
         
         // 3. Run Inference (Mel Spectrogram -> Probability)
-        // rawProb = inferenceEngine->run(features);
+        rawProb = inferenceEngine->run(features);
     }
 
     // 4. Smooth the prediction
