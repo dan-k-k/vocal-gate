@@ -47,7 +47,7 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
     inputLevelMeterLabel.setFont(juce::Font(12.0f)); 
     inputLevelMeterLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.45f));
     inputLevelMeterLabel.setJustificationType(juce::Justification::centred);
-    inputLevelMeterLabel.setTooltip("How your input volume level compares\nwith the AI training data\n(5s time constant EMA RMS).");
+    inputLevelMeterLabel.setTooltip("How your input volume level compares\nwith the AI training data\n(5s time constant EMA RMS).\nIdeally within +-3 dB.");
     addAndMakeVisible(inputLevelMeterLabel);
     
     // Auto gain match button
