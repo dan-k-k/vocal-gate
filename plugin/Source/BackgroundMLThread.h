@@ -4,7 +4,6 @@
 #include "AudioFIFO.h"
 #include "ParameterManager.h"
 
-// Forward declarations for the modules we will build next
 class FeatureExtractor;
 class InferenceEngine;
 
@@ -15,22 +14,22 @@ public:
     ~BackgroundMLThread() override;
 
     // Lifecycle
-    void prepare(double sampleRate, int samplesPerHop, const ParameterManager& params); // <-- Add the 3rd argument
+    void prepare(double sampleRate, int samplesPerHop, const ParameterManager& params); 
     void startProcessing();
     void stopProcessing();
 
     // The thread loop
     void run() override;
 
-    // Real-time safe method for GateDSP to read the probability
+    // For GateDSP to read the probability
     const std::atomic<float>* getProbRingBuffer() const { return probRingBuffer.get(); }
     int getProbBufferSize() const { return probBufferSize; }
 
-    // Real-time safe methods for Processor to push audio
+    // For Processor to push audio
     void pushAudio(const float* data, int numSamples);
     void notifyDataReady();
     
-    // NEW: Offline rendering methods
+    // Offline rendering 
     void setOfflineMode(bool offline); 
     void processNextOfflineHop(const ParameterManager& params);
 
@@ -42,11 +41,11 @@ private:
     void processMLHop(const float* hopData, const ParameterManager& params);
     float pushAndAveragePrediction(float rawProb, float smoothMs);
 
-    // Thread synchronization
+    // Thread synchronisation
     std::atomic<bool> mlDataReady { false };
-    std::atomic<bool> isOffline { false }; // Make this atomic for thread safety
+    std::atomic<bool> isOffline { false }; 
 
-    // Sub-modules (Owned by this thread)
+    // Sub-modules 
     std::unique_ptr<FeatureExtractor> featureExtractor;
     std::unique_ptr<InferenceEngine> inferenceEngine;
 
@@ -54,7 +53,7 @@ private:
     std::unique_ptr<AudioFIFO> audioFifo;
     std::vector<float> dawHopBuffer;
     
-    // Communication back to the audio thread
+    // Communication with the audio thread
     int probBufferSize = 0;
     std::unique_ptr<std::atomic<float>[]> probRingBuffer;
     uint64_t mlWriteIndex = 0;
@@ -64,13 +63,13 @@ private:
     std::array<float, maxPredictionFrames> predictionHistory { 0.0f };
     int predictionWriteIndex = 0;
 
-    // Transient Pad State
+    // Transient pad
     int padDurationHops = 0;
     int armingHops = 0;
     int consecutiveSilentHops = 0;
     int padActiveHopsRemaining = 0;
 
-    // We store a reference to params safely via a pointer that gets passed in
+    // Reference to params
     const ParameterManager* currentParams = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BackgroundMLThread)

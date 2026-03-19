@@ -6,8 +6,7 @@
 #if JUCE_WINDOWS
 #define NOMINMAX
 #include <windows.h>
-// We need a dummy address to find the current DLL module in memory
-static void dummyFunctionForModuleHandle() {}
+static void dummyFunctionForModuleHandle() {} // Dummy address to find the current DLL module in memory
 #endif
 
 InferenceEngine::InferenceEngine()
@@ -19,10 +18,9 @@ InferenceEngine::InferenceEngine()
         memoryInfo = std::make_unique<Ort::MemoryInfo>(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
 
         Ort::SessionOptions sessionOptions;
-        sessionOptions.SetIntraOpNumThreads(1); // Keep it strictly single-threaded to avoid audio dropouts
+        sessionOptions.SetIntraOpNumThreads(1); // Single-threaded avoids audio dropouts
         sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        // Load model directly from JUCE BinaryData
         onnxSession = std::make_unique<Ort::Session>(
             *onnxEnv, 
             BinaryData::vocalgate_int8_onnx, 
@@ -46,7 +44,7 @@ float InferenceEngine::run(std::vector<float>& logMelFeatures)
     if (onnxSession == nullptr) return 0.0f;
 
     try {
-        // 1. Wrap the input memory block into an ONNX tensor
+        // Wrap input and output memory blocks into ONNX tensors
         Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
             *memoryInfo, 
             logMelFeatures.data(), 
@@ -55,7 +53,6 @@ float InferenceEngine::run(std::vector<float>& logMelFeatures)
             4
         );
 
-        // 2. Wrap the output memory block into an ONNX tensor
         Ort::Value outputTensor = Ort::Value::CreateTensor<float>(
             *memoryInfo,
             outputLogitData.data(),
@@ -67,7 +64,7 @@ float InferenceEngine::run(std::vector<float>& logMelFeatures)
         const char* inputNames[] = {"input_log_mel"};
         const char* outputNames[] = {"gate_logit"};
 
-        // 3. Run Inference
+        // Get prediction
         onnxSession->Run(
             Ort::RunOptions{nullptr}, 
             inputNames, 
@@ -78,11 +75,11 @@ float InferenceEngine::run(std::vector<float>& logMelFeatures)
             1
         );
 
-        // 4. Apply Sigmoid activation to the raw logit to get a 0.0 - 1.0 probability
+        // Convert to [0.0, 1.0] prob
         return 1.0f / (1.0f + std::exp(-outputLogitData[0]));
 
     } catch (const Ort::Exception& e) {
-        juce::Logger::writeToLog("ONNX RUN ERROR: " + juce::String(e.what()));
+        juce::Logger::writeToLog("ONNX run error: " + juce::String(e.what()));
         return 0.0f; // Fail gracefully to silence/open gate
     }
 }

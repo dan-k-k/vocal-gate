@@ -24,7 +24,7 @@ public:
 
     void reset()
     {
-        // 0.0 linear power equals -inf dB
+        // 0.0 linear = -inf dB
         smoothedPower.store(0.0f, std::memory_order_relaxed);
     }
 
@@ -45,14 +45,12 @@ public:
             }
         }
 
-        // 1. Calculate the linear power of this current block
+        // Calc linear power
         float meanSquare = sumSquares / static_cast<float>(numSamples * numChannels);
-        
-        // 2. We only calculate currentDb here to check our -50dB Noise Floor gate
         float currentRms = std::sqrt(meanSquare);
         float currentDb = juce::Decibels::gainToDecibels(currentRms, -100.0f);
 
-        // 3. Apply the EMA to the LINEAR POWER (not the decibels)
+        // Apply EMA to the linear power
         if (currentDb >= -50.0f)
         {
             float prevPower = smoothedPower.load(std::memory_order_relaxed);
@@ -69,7 +67,6 @@ public:
 
     float getDbDifferenceFromTarget(float targetDb = -21.5f) const
     {
-        // 4. Convert the smoothed power back to decibels just for the UI
         float currentPower = smoothedPower.load(std::memory_order_relaxed);
         float smoothedRms = std::sqrt(currentPower);
         float smoothedDb = juce::Decibels::gainToDecibels(smoothedRms, -100.0f);

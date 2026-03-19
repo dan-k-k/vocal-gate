@@ -1,7 +1,7 @@
 // plugin/Source/BackgroundMLThread.cpp
 #include "BackgroundMLThread.h"
-#include "FeatureExtractor.h"  // (To be implemented)
-#include "InferenceEngine.h"   // (To be implemented)
+#include "FeatureExtractor.h"
+#include "InferenceEngine.h"
 
 BackgroundMLThread::BackgroundMLThread()
     : juce::Thread("ONNX_ML_Thread")
@@ -20,25 +20,25 @@ void BackgroundMLThread::prepare(double sampleRate, int samplesPerHop, const Par
     stopProcessing();
     currentParams = &params;
 
-    // 1. Setup Audio FIFO (2 seconds worth of buffering)
+    // Setup audio FIFO buffer (2sec)
     audioFifo = std::make_unique<AudioFIFO>(static_cast<int>(sampleRate * 2.0));
     dawHopBuffer.assign(samplesPerHop, 0.0f);
 
-    // 2. Setup Probability Ring Buffer
+    // Setup prob ring buffer
     probBufferSize = static_cast<int>(sampleRate * 2.0);
     probRingBuffer = std::make_unique<std::atomic<float>[]>(probBufferSize);
     for (int i = 0; i < probBufferSize; ++i) {
         probRingBuffer[i].store(0.0f, std::memory_order_relaxed);
     }
 
-    // 3. Reset state
+    // Reset state
     mlWriteIndex = 0;
     predictionHistory.fill(0.0f);
     predictionWriteIndex = 0;
     mlDataReady.store(false);
 
-    double padDurationSeconds = 1.0; // To completely fill the ends of the spectrogram
-    double armingSeconds = 0.3;      // How much silence is needed to re-arm
+    double padDurationSeconds = 1.0; // Fills the ends of the spectrogram
+    double armingSeconds = 0.3;      // Patience needed to re-arm
     int safeSamplesPerHop = std::max(1, samplesPerHop); 
     padDurationHops = static_cast<int>(std::ceil((padDurationSeconds * sampleRate) / safeSamplesPerHop));
     armingHops = static_cast<int>(std::ceil((armingSeconds * sampleRate) / safeSamplesPerHop));
@@ -60,9 +60,7 @@ void BackgroundMLThread::stopProcessing()
         stopThread(4000); // 4 seconds timeout
 }
 
-// -----------------------------------------------------------------------------
-// REAL-TIME COMMUNICATION
-// -----------------------------------------------------------------------------
+// Real-time communication
 
 void BackgroundMLThread::pushAudio(const float* data, int numSamples)
 {
@@ -80,9 +78,7 @@ void BackgroundMLThread::setOfflineMode(bool offline)
     isOffline.store(offline, std::memory_order_relaxed);
 }
 
-// -----------------------------------------------------------------------------
-// THREAD LOOP
-// -----------------------------------------------------------------------------
+// Thread loop
 
 void BackgroundMLThread::run()
 {
@@ -106,14 +102,12 @@ void BackgroundMLThread::run()
         }
         else
         {
-            juce::Thread::sleep(5); // Rest the CPU
+            juce::Thread::sleep(5); // Rest 
         }
     }
 }
 
-// -----------------------------------------------------------------------------
-// CORE ML PIPELINE
-// -----------------------------------------------------------------------------
+// Core ML pipeline
 
 void BackgroundMLThread::processNextOfflineHop(const ParameterManager& params)
 {
@@ -133,7 +127,7 @@ void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManag
     int hopSize = static_cast<int>(dawHopBuffer.size());
     const float silenceThreshold = juce::Decibels::decibelsToGain(-50.0f);
     
-    // 1. Find Peak Level
+    // Find peak
     float peakLevel = 0.0f;
     for (int i = 0; i < hopSize; ++i) {
         peakLevel = std::max(peakLevel, std::abs(hopData[i]));
@@ -142,14 +136,10 @@ void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManag
     bool isSilent = (peakLevel < silenceThreshold);
     float rawProb = 0.0f;
 
-    // ------------------------------------------------------------------
-    // THE FIX: ALWAYS EXTRACT FEATURES!
-    // This ensures the rolling spectrogram buffer is always filling up 
-    // with real audio, even while we are bypassing the ML inference.
-    // ------------------------------------------------------------------
+    // Always extract features to fill the spectrofram buffer completely when bypassing ML inference
     auto features = featureExtractor->process(hopData);
 
-    // 2. Transient Pad Logic & Inference
+    // Transient/silence padding logic and inference
     if (isSilent) 
     {
         consecutiveSilentHops++;
@@ -161,7 +151,7 @@ void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManag
     } 
     else 
     {
-        // Check against the 0.3s arming requirement, NOT the 1.0s pad duration!
+        // If silence lasts longer than number of armingHops (0.3sec)
         if (consecutiveSilentHops >= armingHops) {
             padActiveHopsRemaining = padDurationHops;
         }
@@ -170,22 +160,20 @@ void BackgroundMLThread::processMLHop(const float* hopData, const ParameterManag
 
         if (padActiveHopsRemaining > 0) 
         {
-            // BYPASS INFERENCE ONLY: Force rawProb to 0.0f
+            // Bypass inference and set rawProb to 0.0f
             rawProb = 0.0f;
             padActiveHopsRemaining--;
         } 
         else 
         {
-            // RUN INFERENCE: The model now receives a fully populated, 
-            // natural-looking spectrogram!
+            // Run inference
             rawProb = inferenceEngine->run(features);
         }
     }
 
-    // 3. Smooth the prediction
     float smoothedProb = pushAndAveragePrediction(rawProb, params.getProbSmoothing());
     
-    // 4. Write back to the Probability Ring Buffer
+    // Write back to the prob ring buffer
     for (int i = 0; i < hopSize; ++i) 
     {
         int writePos = (mlWriteIndex + i) % probBufferSize;

@@ -11,7 +11,7 @@ public:
     InferenceEngine();
     ~InferenceEngine() = default;
 
-    // Takes the 40x61 flat Mel Spectrogram, returns a gate probability (0.0 to 1.0)
+    // Returns a gate probability [0.0, 1.0] from the spectrogram
     float run(std::vector<float>& logMelFeatures);
 
     bool isModelLoaded() const { return onnxSession != nullptr; }
@@ -24,7 +24,7 @@ private:
     std::unique_ptr<Ort::MemoryInfo> memoryInfo;
     std::unique_ptr<Ort::Session> onnxSession;
 
-    // Pre-allocated output and tensor shapes
+    // Output and tensor shapes
     std::array<float, 1> outputLogitData { 0.0f }; 
     
     // 1 Batch, 1 Channel, 40 Mels, 61 Frames
