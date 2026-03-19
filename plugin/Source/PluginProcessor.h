@@ -15,16 +15,16 @@ public:
     VocalGateProcessor();
     ~VocalGateProcessor() override;
 
-    // Standard JUCE audio lifecycle
+    // JUCE audio lifecycle
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
-    // Editor integration
+    // Editor
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    // Standard JUCE metadata
+    // JUCE metadata
     const juce::String getName() const override { return "Vocal Gate"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
@@ -38,24 +38,22 @@ public:
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
-    // State handling (Delegated to ParameterManager)
+    // State handling (delegated to ParameterManager)
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     // Public module for the Editor to connect to
     ParameterManager parameterManager;
 
-    // Public getters for the Editor to read meters
     float getInputLevel() const  { return dspCore.getInputLevel(); }
     float getOutputLevel() const { return dspCore.getOutputLevel(); }
     float getGateProbability() const { return dspCore.getGateProbability(); }
     float getDbDifferenceFromTarget() const { return inputVolumeTracker.getDbDifferenceFromTarget(); }
 
 private:
-    // Core Modules
     GateDSP dspCore;
     BackgroundMLThread mlThread;
-    EmaRmsTracker inputVolumeTracker; // <--- 3. Instantiate tracker
+    EmaRmsTracker inputVolumeTracker;
 
     int dawSamplesPerHop = 0;
     std::vector<float> offlineHopBuffer;

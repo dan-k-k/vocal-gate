@@ -4,7 +4,6 @@
 ParameterManager::ParameterManager(juce::AudioProcessor& processor)
     : apvts(processor, nullptr, "Parameters", createParameterLayout())
 {
-    // Cache the atomic pointers once during instantiation
     thresholdParam     = apvts.getRawParameterValue("threshold");
     floorParam         = apvts.getRawParameterValue("floor");
     attackParam        = apvts.getRawParameterValue("attack");
