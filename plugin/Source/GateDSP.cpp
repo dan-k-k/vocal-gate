@@ -10,7 +10,7 @@ void GateDSP::prepare(const juce::dsp::ProcessSpec& spec, int samplesPerHop)
     dawSampleRate = spec.sampleRate;
     dawSamplesPerHop = samplesPerHop;
     
-    // Default lookahead latency (0.750 seconds)
+    // Default lookahead latency (0.750 seconds): covers the 0.55s delay required to process predictions near the centre of 'future' audio + past audio, addition latency for users that add a shift to the probability line +-200ms.
     lookaheadSamples = static_cast<int>(dawSampleRate * 0.750); 
 
     delayLine.setMaximumDelayInSamples(static_cast<int>(dawSampleRate * 2.0));
@@ -36,14 +36,14 @@ void GateDSP::process(juce::AudioBuffer<float>& buffer,
     float* outL = buffer.getWritePointer(0);
     float* outR = (numChannels > 1) ? buffer.getWritePointer(1) : nullptr;
 
-    // Grab current parameters from our clean manager
+    // Get current parameters
     float currentThreshold = params.getThreshold();
     float currentFloorDB   = params.getFloor();
     float currentAttackMs  = params.getAttack();
     float currentReleaseMs = params.getRelease();
     float shiftMs          = params.getShift();
 
-    // Calculate coefficients
+    // Calc coefficients
     float attackCoef = std::exp(-1.0f / (currentAttackMs * 0.001f * dawSampleRate));
     float releaseCoef = std::exp(-1.0f / (currentReleaseMs * 0.001f * dawSampleRate));
     float duckingGain = (currentFloorDB <= -99.9f) ? 0.0f : juce::Decibels::decibelsToGain(currentFloorDB);
@@ -58,7 +58,7 @@ void GateDSP::process(juce::AudioBuffer<float>& buffer,
 
     for (int i = 0; i < numSamples; ++i)
     {
-        // 1. Process fixed audio delay
+        // Fixed audio delay
         float inL = buffer.getSample(0, i);
         float delayedL = delayLine.popSample(0);
         delayLine.pushSample(0, inL);
@@ -71,7 +71,7 @@ void GateDSP::process(juce::AudioBuffer<float>& buffer,
             outR[i] = delayedR;
         }
 
-        // 2. Read the synchronized ML probability
+        // Synced ML probability
         int64_t syncedIndex = localReadIndex - lookaheadSamples + halfWindowSamples - dawSamplesPerHop - shiftSamples;
         int readPos = static_cast<int>(syncedIndex % probBufferSize); 
         if (readPos < 0) { readPos += probBufferSize; }
@@ -82,7 +82,7 @@ void GateDSP::process(juce::AudioBuffer<float>& buffer,
         }
         gateProbability.store(currentProb, std::memory_order_relaxed);
 
-        // 3. Apply gate envelope
+        // Apply gate envelope
         float targetGain = (currentProb < currentThreshold) ? 1.0f : duckingGain;
 
         if (targetGain < currentGainEnvelope) {
@@ -91,11 +91,10 @@ void GateDSP::process(juce::AudioBuffer<float>& buffer,
             currentGainEnvelope = releaseCoef * currentGainEnvelope + (1.0f - releaseCoef) * targetGain;
         }
 
-        // 4. Output math
+        // Output
         outL[i] *= currentGainEnvelope;
         if (outR != nullptr) outR[i] *= currentGainEnvelope;
 
-        // 5. Update peaks
         currentInPeak = std::max(currentInPeak, std::abs(delayedL));
         currentOutPeak = std::max(currentOutPeak, std::abs(outL[i]));
 

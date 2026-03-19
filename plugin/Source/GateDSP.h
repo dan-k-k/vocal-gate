@@ -10,17 +10,14 @@ public:
     GateDSP();
     ~GateDSP() = default;
 
-    // Called in Processor::prepareToPlay
+    // For Processor::prepareToPlay
     void prepare(const juce::dsp::ProcessSpec& spec, int dawSamplesPerHop);
 
-    // Called in Processor::processBlock
-    // We pass the shared probability buffer that the ML thread writes to
-    void process(juce::AudioBuffer<float>& buffer, 
-                 const ParameterManager& params,
-                 const std::atomic<float>* probRingBuffer, 
-                 int probBufferSize);
+    // For Processor::processBlock
+    void process(juce::AudioBuffer<float>& buffer, const ParameterManager& params, 
+        const std::atomic<float>* probRingBuffer, int probBufferSize);
 
-    // Real-time safe getters for your GUI meters
+    // Getters for GUI
     float getInputLevel() const  { return inputLevel.load(std::memory_order_relaxed); }
     float getOutputLevel() const { return outputLevel.load(std::memory_order_relaxed); }
     float getGateProbability() const { return gateProbability.load(std::memory_order_relaxed); }
@@ -32,14 +29,14 @@ private:
     int lookaheadSamples = 0;
     int dawSamplesPerHop = 0;
 
-    // Audio State
+    // Audio state
     float currentGainEnvelope = 1.0f;
     std::atomic<uint64_t> audioReadIndex { 0 };
 
     // Delay line for lookahead
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 96000 };
 
-    // Metering state
+    // Metering
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
     std::atomic<float> gateProbability { 0.0f };

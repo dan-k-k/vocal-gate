@@ -10,7 +10,6 @@ public:
     FeatureExtractor();
     ~FeatureExtractor() = default;
 
-    // Called once when the plugin playback starts
     void prepare(double dawSampleRate, int dawSamplesPerHop);
 
     // Takes a raw audio hop, computes the Mel Spectrogram, and returns it
@@ -19,12 +18,12 @@ public:
 private:
     void computeLogMels();
 
-    // Configuration constants
+    // Configuration
     static constexpr int targetSampleRate = 16000;
     static constexpr int targetHopSamples = 800; // 50ms at 16kHz
     static constexpr int rollingBufferSize = 16000; // 1 second of 16kHz audio
     
-    // Mel Spectrogram constants
+    // Mel Spectrogram
     static constexpr size_t n_fft = 512;
     static constexpr size_t hop_length = 256;
     static constexpr size_t num_frames = 61;     

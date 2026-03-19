@@ -28,20 +28,17 @@ void FeatureExtractor::prepare(double dawSampleRate, int dawSamplesPerHop)
 
 const std::vector<float>& FeatureExtractor::process(const float* hopData)
 {
-    // 1. Resample the incoming DAW hop to 16kHz
+    // Resample incoming DAW hop to 16kHz
     double ratio = sourceSampleRate / static_cast<double>(targetSampleRate);
     resampler.process(ratio, hopData, resampledHopBuffer.data(), targetHopSamples);
 
-    // 2. Shift the rolling 1-second buffer to the left
+    // Shift 1-second buffer to left by 0.05s
     int shiftAmount = targetHopSamples;
     int keepAmount = rollingBufferSize - shiftAmount;
     
     std::memmove(rolling16kBuffer.data(), rolling16kBuffer.data() + shiftAmount, keepAmount * sizeof(float));
-    
-    // 3. Append the new resampled audio to the end of the rolling buffer
     std::memcpy(rolling16kBuffer.data() + keepAmount, resampledHopBuffer.data(), shiftAmount * sizeof(float));
 
-    // 4. Compute the actual Mel Spectrogram
     computeLogMels();
 
     return logMelFeatures;
@@ -53,23 +50,20 @@ void FeatureExtractor::computeLogMels()
     {
         size_t start_sample = frame * hop_length;
 
-        // Clear time domain buffer
         std::fill(timeDomain.begin(), timeDomain.end(), 0.0f);
 
-        // Apply Hann Window
+        // Hann Window
         for (size_t i = 0; i < n_fft; ++i) {
             timeDomain[i] = rolling16kBuffer[start_sample + i] * DSPConstants::hannWindow512[i];
         }
 
-        // Perform in-place FFT
         forwardFFT.performFrequencyOnlyForwardTransform(timeDomain.data());
         
-        // Compute Power Spectrum
         for (size_t i = 0; i < num_freq_bins; ++i) {
             powerSpec[i] = timeDomain[i] * timeDomain[i];
         }
 
-        // Apply Mel Filterbank
+        // Mel filterbank
         for (size_t m = 0; m < num_mels; ++m) 
         {
             float sum = 0.0f;
@@ -77,10 +71,7 @@ void FeatureExtractor::computeLogMels()
                 sum += powerSpec[f] * DSPConstants::melFilterBank[f][m];
             }
             
-            // Convert to Log (dB) and avoid log(0) with a tiny noise floor
             melEnergies[m] = 10.0f * std::log10(std::max(sum, 1e-10f));
-            
-            // Store in the flat output tensor array
             logMelFeatures[m * num_frames + frame] = melEnergies[m];
         }
     }
