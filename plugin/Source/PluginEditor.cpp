@@ -38,19 +38,17 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
         addAndMakeVisible(label);
     };
 
-    // UI Color Palette
     juce::Colour utilityColor   = juce::Colour::fromRGB(220, 80, 150); // Magenta for Global IO
     juce::Colour detectionColor = juce::Colours::darkorange;           // Orange for ML
     juce::Colour envelopeColor  = juce::Colour::fromRGB(40, 210, 180); // Blue for DSP
 
-    // Setup the helper meter label
+    // Volume meter and Match UI
     inputLevelMeterLabel.setFont(juce::Font(12.0f)); 
     inputLevelMeterLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.45f));
     inputLevelMeterLabel.setJustificationType(juce::Justification::centred);
     inputLevelMeterLabel.setTooltip("How your input volume level compares\nwith the AI training data\n(5s time constant EMA RMS).\nIdeally within +-3 dB.");
     addAndMakeVisible(inputLevelMeterLabel);
     
-    // Auto gain match button
     matchButton.setButtonText("Match");
     matchButton.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
     matchButton.setColour(juce::TextButton::textColourOffId, utilityColor.withAlpha(0.8f)); 
@@ -60,30 +58,21 @@ VocalGateEditor::VocalGateEditor (VocalGateProcessor& p)
     {
         float currentDelta = audioProcessor.getDbDifferenceFromTarget();
         
-        // Don't do anything if we are in the "--" initialized/silence state
         if (currentDelta <= -68.0f) return; 
-
-        // Get the current knob value
         float currentGain = static_cast<float>(inputGainSlider.getValue());
-        
-        // Calculate the perfect gain needed
         float newGain = currentGain - currentDelta;
-
-        // Update the slider! The APVTS SliderAttachment will automatically 
-        // catch this, clamp it to your parameter's min/max bounds, and 
-        // update the backend processor instantly.
         inputGainSlider.setValue(newGain, juce::sendNotificationSync);
     };
 
-    // 1. Utility (Far Left)
+    // Utilities
     setupKnob(inputGainSlider, inputGainLabel, "Input", " dB", "input_gain", inputGainAttachment, utilityColor);
 
-    // 2. Detection Group
+    // Detection
     setupKnob(thresholdSlider, thresholdLabel, "Threshold", "", "threshold", thresholdAttachment, detectionColor);
     setupKnob(probSmoothSlider, probSmoothLabel, "Smooth", " ms", "probsmoothing", probSmoothAttachment, detectionColor);
     setupKnob(shiftSlider, shiftLabel, "Shift", " ms", "shift", shiftAttachment, detectionColor);
 
-    // 3. Envelope Group
+    // Envelope
     setupKnob(floorSlider, floorLabel, "Floor", " dB", "floor", floorAttachment, envelopeColor);
     setupKnob(attackSlider, attackLabel, "Attack", " ms", "attack", attackAttachment, envelopeColor);
     setupKnob(releaseSlider, releaseLabel, "Release", " ms", "release", releaseAttachment, envelopeColor);
@@ -108,9 +97,8 @@ void VocalGateEditor::timerCallback()
     outputHistory[writeIndex] = audioProcessor.getOutputLevel();
     float rawProb             = audioProcessor.getGateProbability(); 
     
-    // Fetch and format the delta dB value
     float dbDiff = audioProcessor.getDbDifferenceFromTarget();
-    if (dbDiff < -80.0f) // Handle silence gracefully
+    if (dbDiff < -80.0f) 
     {
         inputLevelMeterLabel.setText("-inf dB", juce::dontSendNotification);
     }
@@ -204,30 +192,21 @@ void VocalGateEditor::resized()
     auto bounds = getLocalBounds();
     auto bottomArea = bounds.removeFromBottom(110); 
     
-    // 1. Reduce squeeze from 40 to 25 to gain 30px of total width
     int squeezePixels = 25; 
     bottomArea = bottomArea.withTrimmedLeft(squeezePixels).withTrimmedRight(squeezePixels);
     
     int shiftDown = 8;
 
-    // 2. UTILITY GROUP
-    // Keep the width at 120, but we'll add a 15px spacer after it
+    // Utility
     auto utilityArea = bottomArea.removeFromLeft(120);
     auto knobArea = utilityArea.removeFromLeft(70);
     auto helperArea = utilityArea; 
 
-    // Main Input Knob
     inputGainSlider.setBounds(knobArea.withSizeKeepingCentre(70, 50).translated(0, shiftDown));
-    
-    // Helpers: Hardcoded 16px heights with exact 9.5f offsets for a 3px gap
     inputLevelMeterLabel.setBounds(helperArea.withSizeKeepingCentre(60, 19).translated(0, shiftDown - 17.f));
     matchButton.setBounds(helperArea.withSizeKeepingCentre(60, 19).translated(0, shiftDown + 4.0f));
 
-    // 3. THE SPACER
-    // This creates a visual "break" between Input and Threshold
     bottomArea.removeFromLeft(15); 
-
-    // 4. THE REST (The 6 remaining knobs)
     int knobWidth = bottomArea.getWidth() / 6; 
 
     thresholdSlider.setBounds(bottomArea.removeFromLeft(knobWidth).withSizeKeepingCentre(70, 70).translated(0, shiftDown));

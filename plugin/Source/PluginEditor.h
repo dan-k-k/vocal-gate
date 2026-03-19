@@ -59,8 +59,8 @@ private:
     juce::Label inputGainLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> inputGainAttachment;
 
-    juce::Label inputLevelMeterLabel; 
-    juce::TextButton matchButton; // <--- ADD THIS HERE
+    juce::Label inputLevelMeterLabel;
+    juce::TextButton matchButton;
 
     juce::Slider thresholdSlider;
     juce::Label thresholdLabel;
