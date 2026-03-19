@@ -54,15 +54,11 @@ target_sources(VocalGate
     PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
-        
-        # New Refactored Modules
         Source/ParameterManager.cpp
         Source/GateDSP.cpp
         Source/BackgroundMLThread.cpp
         Source/FeatureExtractor.cpp
         Source/InferenceEngine.cpp
-        
-        # Existing Headers
         Source/AudioFIFO.h
         Source/DSPConstants.h
 )
@@ -92,9 +88,9 @@ target_link_libraries(VocalGate
         juce::juce_recommended_warning_flags
 )
 
-# OS-Specific linking and bundling
+# OS-specific linking
 if(APPLE)
-    # Mac, M-series. Requires Apple Dev Kit to allow external libraries (onnxruntime dylib) to work in DAW hardened runtime. Will need a new solution to get this running on Mac (raw c++, RTNeural, bundling the full onnx lib?) without buying Apple's Dev Kit :( .
+    # Mac M-series.
     target_link_libraries(VocalGate PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.1.24.2.dylib
     )
