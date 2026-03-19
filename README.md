@@ -1,11 +1,9 @@
 ## Vocal Gate VST3 & AU (Free)
 
-An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts (coughing, sneezing, etc.) and background noise. 
-
-This plugin is intended for Creators and Editors (Podcasts, Youtube, etc.) who need an easy, accurate filter. 
+Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Whether you need an automatic cough remover for your podcast/Youtube video, a sneeze ducker for your Twitch live stream, or a smart filter to block keyboard clicks and heavy breathing, this plugin processes your audio in real-time. 
 
 <p align="center">
-  <img src="images/LogMel_Plugin_Demo1.gif" alt="LogMel_Plugin_Demo1" width="500">
+  <img src="images/LogMel_Plugin_Demo1.gif" alt="Free AI Noise Gate VST3 removing coughs and sneezes in real time" width="500">
 </p>
 
 <p align="center">
@@ -21,7 +19,7 @@ This plugin is intended for Creators and Editors (Podcasts, Youtube, etc.) who n
 <p align="center">
   <small><b>Requires:</b> macOS 11+ (M-series) &nbsp;|&nbsp; Windows 10+ (64-bit) | <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i>
 </small><br>
-  <small><i>Note: This installer is unsigned to save money. On macOS, right-click open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'.</small></i>
+  <small><i>Note: This installer is unsigned. On macOS, right-click open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'.</small></i>
 </p>
 
 ### Real-World Use Examples
@@ -32,6 +30,16 @@ This plugin is intended for Creators and Editors (Podcasts, Youtube, etc.) who n
   </a>
 </p>
 <p align="center"><i>Watch the full demo on YouTube</i></p>
+
+#### Can be used for:
+* **Live Streaming:** Twitch, YouTube Live, Kick, Facebook Gaming
+* **Podcasting:** Spotify, Apple Podcasts, Patreon
+* **Video Content:** YouTube VODs, TikTok, Instagram Reels
+
+#### Can be used in:
+* **Broadcasting:** OBS Studio, Streamlabs, vMix
+* **Video Editing:** DaVinci Resolve, Adobe Premiere Pro, Final Cut Pro
+* **DAWs & Audio:** Reaper, Logic Pro, FL Studio, Ableton Live, Audacity
 
 ---
 
