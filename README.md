@@ -35,7 +35,8 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 * **Live Streaming:** Twitch, YouTube Live, Kick, Facebook Gaming
 * **Podcasting:** Spotify, Apple Podcasts, Patreon
 * **Video Content:** YouTube VODs, TikTok, Instagram Reels
-*STREAMERS: The AI model requires a 750ms lookahead to work. You MUST delay your webcam/game or app audio/game or app video/anything else by 750ms in OBS (etc.) to keep everything in sync!*
+
+* **IF RECORDING LIVE**: The AI model requires a 750ms lookahead to work. You MUST delay your webcam/game or app audio/game or app video/anything else by 750ms in OBS (etc.) to keep everything in sync!*
 
 #### Can be used in:
 * **Broadcasting:** OBS Studio, Streamlabs, vMix
