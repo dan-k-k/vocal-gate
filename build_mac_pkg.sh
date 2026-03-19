@@ -8,11 +8,9 @@ echo "Building macOS .pkg Installer for version $VERSION..."
 mkdir -p Payload/Library/Audio/Plug-Ins/VST3
 mkdir -p Payload/Library/Audio/Plug-Ins/Components
 
-# Copy the compiled plugins into staging area
 cp -R "build/VocalGate_artefacts/Release/VST3/Vocal Gate.vst3" "Payload/Library/Audio/Plug-Ins/VST3/"
 cp -R "build/VocalGate_artefacts/Release/AU/Vocal Gate.component" "Payload/Library/Audio/Plug-Ins/Components/"
 
-# pkgbuild tool
 pkgbuild --root Payload \
          --identifier com.dank.vocalgate \
          --version $VERSION \

@@ -28,8 +28,7 @@ Source: "build\VocalGate_artefacts\Release\VST3\Vocal Gate.vst3\*"; DestDir: "{c
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Run]
-; Execute the Redistributable
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /passive /norestart"; StatusMsg: "Installing Visual C++ Redistributable (Required for AI features)..."; Flags: waituntilterminated
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /passive /norestart"; StatusMsg: "Installing Visual C++ Redistributable (Required for AI inference)..."; Flags: waituntilterminated
 
 [Messages]
 BeveledLabel=DanK
