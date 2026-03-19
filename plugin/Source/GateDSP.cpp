@@ -72,18 +72,26 @@ void GateDSP::process(juce::AudioBuffer<float>& buffer,
         }
 
         // Synced ML probability
-        int64_t syncedIndex = localReadIndex - lookaheadSamples + halfWindowSamples - dawSamplesPerHop - shiftSamples;
-        int readPos = static_cast<int>(syncedIndex % probBufferSize); 
-        if (readPos < 0) { readPos += probBufferSize; }
+        int64_t baseIndex = localReadIndex - lookaheadSamples + halfWindowSamples - dawSamplesPerHop;
+        int64_t dspIndex = baseIndex - shiftSamples;
+        int uiReadPos = static_cast<int>(baseIndex % probBufferSize);
+        if (uiReadPos < 0) { uiReadPos += probBufferSize; }
 
-        float currentProb = 0.0f;
+        int dspReadPos = static_cast<int>(dspIndex % probBufferSize);
+        if (dspReadPos < 0) { dspReadPos += probBufferSize; }
+
+        float uiProb = 0.0f;
+        float dspProb = 0.0f;
+
         if (probRingBuffer != nullptr) {
-            currentProb = probRingBuffer[readPos].load(std::memory_order_relaxed);
+            uiProb = probRingBuffer[uiReadPos].load(std::memory_order_relaxed);
+            dspProb = probRingBuffer[dspReadPos].load(std::memory_order_relaxed);
         }
-        gateProbability.store(currentProb, std::memory_order_relaxed);
+
+        gateProbability.store(uiProb, std::memory_order_relaxed); // Give the UI the unshifted probability so it can handle the sliding visually
 
         // Apply gate envelope
-        float targetGain = (currentProb < currentThreshold) ? 1.0f : duckingGain;
+        float targetGain = (dspProb < currentThreshold) ? 1.0f : duckingGain;
 
         if (targetGain < currentGainEnvelope) {
             currentGainEnvelope = attackCoef * currentGainEnvelope + (1.0f - attackCoef) * targetGain;

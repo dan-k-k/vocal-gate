@@ -144,14 +144,17 @@ void VocalGateEditor::paint (juce::Graphics& g)
 
     for (int i = 0; i < historySize; ++i)
     {
+        // Audio uses the current real-time index
         size_t audioReadIndex = (writeIndex + static_cast<size_t>(i)) % historySize;
-        int source_i = i - shiftFrames; 
-        source_i = juce::jlimit(0, historySize - 1, source_i); 
+        // Probability uses the visually shifted index
+        int source_i = i - shiftFrames;
+        source_i = juce::jlimit(0, historySize - 1, source_i); // Prevent out-of-bounds drawing
         size_t probReadIndex = (writeIndex + static_cast<size_t>(source_i)) % historySize;
 
         float x = audioArea.getX() + (i * xStep);
         float inY = audioArea.getBottom() - (inputHistory[audioReadIndex] * audioArea.getHeight());
         float outY = audioArea.getBottom() - (outputHistory[audioReadIndex] * audioArea.getHeight());
+        
         float pY = probArea.getBottom() - (probHistory[probReadIndex] * probArea.getHeight());
 
         inputPath.lineTo(x, inY);
