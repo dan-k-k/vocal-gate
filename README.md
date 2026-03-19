@@ -1,4 +1,4 @@
-## Vocal Gate VST3 & AU
+## Vocal Gate VST3 & AU (Free)
 
 An AI-powered noise gate plugin specifically trained to separate clean speech from artifacts (coughing, sneezing, etc.) and background noise. 
 
