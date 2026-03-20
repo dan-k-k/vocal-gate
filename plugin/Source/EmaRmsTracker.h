@@ -8,15 +8,13 @@
 class EmaRmsTracker
 {
 public:
-    EmaRmsTracker() : smoothedPower(0.0f), alpha(1.0f) {}
+    EmaRmsTracker() : smoothedPower(0.0f), currentSampleRate(44100.0) {}
 
-    void prepare(double sampleRate, int samplesPerBlock)
+    void prepare(double sampleRate, int /*samplesPerBlock*/)
     {
-        const float timeConstantSeconds = 5.0f;
-        
-        if (sampleRate > 0.0 && timeConstantSeconds > 0.0f) 
+        if (sampleRate > 0.0) 
         {
-            alpha = 1.0f - std::exp(-static_cast<float>(samplesPerBlock) / static_cast<float>(sampleRate * timeConstantSeconds));
+            currentSampleRate = sampleRate;
         }
         
         reset();
@@ -31,7 +29,7 @@ public:
     void processBlock(const juce::AudioBuffer<float>& buffer)
     {
         int numChannels = buffer.getNumChannels();
-        int numSamples = buffer.getNumSamples();
+        int numSamples = buffer.getNumSamples(); // Actual block size
 
         if (numSamples == 0 || numChannels == 0) return;
 
@@ -50,16 +48,19 @@ public:
         float currentRms = std::sqrt(meanSquare);
         float currentDb = juce::Decibels::gainToDecibels(currentRms, -100.0f);
 
-        // Apply EMA to the linear power
         if (currentDb >= -50.0f)
         {
+            // Dynamic alpha based on the number of samples in the block
+            const float timeConstantSeconds = 5.0f;
+            float dynamicAlpha = 1.0f - std::exp(-static_cast<float>(numSamples) / static_cast<float>(currentSampleRate * timeConstantSeconds));
+
             float prevPower = smoothedPower.load(std::memory_order_relaxed);
             
             // First run snap (if power is basically zero)
             if (prevPower <= 0.0000000001f) { 
                 smoothedPower.store(meanSquare, std::memory_order_relaxed);
             } else {
-                float newPower = prevPower + alpha * (meanSquare - prevPower);
+                float newPower = prevPower + dynamicAlpha * (meanSquare - prevPower);
                 smoothedPower.store(newPower, std::memory_order_relaxed);
             }
         }
@@ -76,6 +77,6 @@ public:
 
 private:
     std::atomic<float> smoothedPower;
-    float alpha;
+    double currentSampleRate;
 };
 
