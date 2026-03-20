@@ -3,11 +3,13 @@
 
 FeatureExtractor::FeatureExtractor()
 {
-    // Pre-allocate all memory to avoid allocations on the audio/ML threads
     resampledHopBuffer.assign(targetHopSamples, 0.0f);
-    rolling16kBuffer.assign(rollingBufferSize, 0.0f);
     
-    timeDomain.assign(n_fft * 2, 0.0f); // *2 for complex FFT output
+    // Allocate a generous buffer. The buildup reaches ~1280 samples max before clearing.
+    // 2048 gives us a completely safe margin to prevent vector reallocations.
+    audioTailBuffer.assign(2048, 0.0f); 
+    
+    timeDomain.assign(n_fft * 2, 0.0f); 
     powerSpec.assign(num_freq_bins, 0.0f);
     melEnergies.assign(num_mels, 0.0f);
     
@@ -18,62 +20,83 @@ void FeatureExtractor::prepare(double dawSampleRate, int dawSamplesPerHop)
 {
     sourceSampleRate = dawSampleRate;
     sourceSamplesPerHop = dawSamplesPerHop;
-    
     resampler.reset();
     
-    // Clear rolling buffers on playback start
-    std::fill(rolling16kBuffer.begin(), rolling16kBuffer.end(), 0.0f);
+    std::fill(audioTailBuffer.begin(), audioTailBuffer.end(), 0.0f);
     std::fill(logMelFeatures.begin(), logMelFeatures.end(), 0.0f);
+    
+    // Reset our tail tracker on playback start
+    numSamplesInTail = 0; 
 }
 
 const std::vector<float>& FeatureExtractor::process(const float* hopData)
 {
-    // Resample incoming DAW hop to 16kHz
+    // 1. Resample incoming 50ms hop
     double ratio = sourceSampleRate / static_cast<double>(targetSampleRate);
     resampler.process(ratio, hopData, resampledHopBuffer.data(), targetHopSamples);
 
-    // Shift 1-second buffer to left by 0.05s
-    int shiftAmount = targetHopSamples;
-    int keepAmount = rollingBufferSize - shiftAmount;
+    // 2. Overlap-Save: Append new audio strictly after whatever tail is leftover
+    std::memcpy(audioTailBuffer.data() + numSamplesInTail, resampledHopBuffer.data(), targetHopSamples * sizeof(float));
+
+    // 3. Calculate how many NEW frames we can extract
+    size_t totalAvailable = numSamplesInTail + targetHopSamples;
+    size_t newFramesCount = 0;
     
-    std::memmove(rolling16kBuffer.data(), rolling16kBuffer.data() + shiftAmount, keepAmount * sizeof(float));
-    std::memcpy(rolling16kBuffer.data() + keepAmount, resampledHopBuffer.data(), shiftAmount * sizeof(float));
+    if (totalAvailable >= n_fft) {
+        newFramesCount = ((totalAvailable - n_fft) / hop_length) + 1;
+    }
 
-    computeLogMels();
-
-    return logMelFeatures;
-}
-
-void FeatureExtractor::computeLogMels()
-{
-    for (size_t frame = 0; frame < num_frames; ++frame)
+    // 4. Shift existing features left and compute new frames
+    if (newFramesCount > 0) 
     {
-        size_t start_sample = frame * hop_length;
-
-        std::fill(timeDomain.begin(), timeDomain.end(), 0.0f);
-
-        // Hann Window
-        for (size_t i = 0; i < n_fft; ++i) {
-            timeDomain[i] = rolling16kBuffer[start_sample + i] * DSPConstants::hannWindow512[i];
-        }
-
-        forwardFFT.performFrequencyOnlyForwardTransform(timeDomain.data());
-        
-        for (size_t i = 0; i < num_freq_bins; ++i) {
-            powerSpec[i] = timeDomain[i] * timeDomain[i];
-        }
-
-        // Mel filterbank
+        size_t framesToKeep = num_frames - newFramesCount;
         for (size_t m = 0; m < num_mels; ++m) 
         {
-            float sum = 0.0f;
-            for (size_t f = 0; f < num_freq_bins; ++f) {
-                sum += powerSpec[f] * DSPConstants::melFilterBank[f][m];
-            }
+            float* melRow = logMelFeatures.data() + (m * num_frames);
+            // Shift old frames to the left
+            std::memmove(melRow, melRow + newFramesCount, framesToKeep * sizeof(float));
+        }
+
+        // Compute only the new frames
+        for (size_t f = 0; f < newFramesCount; ++f)
+        {
+            size_t startSample = f * hop_length;
             
-            melEnergies[m] = 10.0f * std::log10(std::max(sum, 1e-10f));
-            logMelFeatures[m * num_frames + frame] = melEnergies[m];
+            // Apply Hann Window
+            std::fill(timeDomain.begin(), timeDomain.end(), 0.0f);
+            for (size_t i = 0; i < n_fft; ++i) {
+                timeDomain[i] = audioTailBuffer[startSample + i] * DSPConstants::hannWindow512[i];
+            }
+
+            forwardFFT.performFrequencyOnlyForwardTransform(timeDomain.data());
+
+            // Power Spectrum
+            for (size_t i = 0; i < num_freq_bins; ++i) {
+                powerSpec[i] = timeDomain[i] * timeDomain[i];
+            }
+
+            // Mel Filterbank
+            for (size_t m = 0; m < num_mels; ++m) {
+                float sum = 0.0f;
+                for (size_t bin = 0; bin < num_freq_bins; ++bin) {
+                    sum += powerSpec[bin] * DSPConstants::melFilterBank[bin][m];
+                }
+                
+                float logMel = 10.0f * std::log10(std::max(sum, 1e-10f));
+                
+                // Append to the end of the shifted row
+                size_t featureIdx = (m * num_frames) + (num_frames - newFramesCount + f);
+                logMelFeatures[featureIdx] = logMel;
+            }
         }
     }
+
+    // 5. Update the dynamic tail for the NEXT process call
+    size_t consumedSamples = newFramesCount * hop_length;
+    numSamplesInTail = totalAvailable - consumedSamples; // Accurately retain all uncalculated samples
+    
+    std::memmove(audioTailBuffer.data(), audioTailBuffer.data() + consumedSamples, numSamplesInTail * sizeof(float));
+
+    return logMelFeatures;
 }
 

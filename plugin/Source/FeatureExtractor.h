@@ -2,7 +2,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
-#include "DSPConstants.h" // Assuming your Hann window and Mel bank live here
+#include "DSPConstants.h" 
 
 class FeatureExtractor
 {
@@ -11,18 +11,13 @@ public:
     ~FeatureExtractor() = default;
 
     void prepare(double dawSampleRate, int dawSamplesPerHop);
-
-    // Takes a raw audio hop, computes the Mel Spectrogram, and returns it
     const std::vector<float>& process(const float* hopData);
 
 private:
-    void computeLogMels();
-
     // Configuration
     static constexpr int targetSampleRate = 16000;
     static constexpr int targetHopSamples = 800; // 50ms at 16kHz
-    static constexpr int rollingBufferSize = 16000; // 1 second of 16kHz audio
-    
+
     // Mel Spectrogram
     static constexpr size_t n_fft = 512;
     static constexpr size_t hop_length = 256;
@@ -38,11 +33,14 @@ private:
 
     // Buffers
     std::vector<float> resampledHopBuffer;
-    std::vector<float> rolling16kBuffer;
     
     std::vector<float> timeDomain;
     std::vector<float> powerSpec;
     std::vector<float> melEnergies;
+    
+    // Dynamic Overlap-Save Tail
+    std::vector<float> audioTailBuffer; 
+    size_t numSamplesInTail = 0; // Tracks the fluctuating leftover samples
     
     // The final output buffer fed to the ONNX model
     std::vector<float> logMelFeatures;
