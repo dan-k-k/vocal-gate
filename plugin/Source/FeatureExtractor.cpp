@@ -6,7 +6,7 @@ FeatureExtractor::FeatureExtractor()
     resampledHopBuffer.assign(targetHopSamples, 0.0f);
     
     // Allocate a generous buffer. The buildup reaches ~1280 samples max before clearing.
-    // 2048 gives us a completely safe margin to prevent vector reallocations.
+    // 2048 gives a completely safe margin to prevent vector reallocations.
     audioTailBuffer.assign(2048, 0.0f); 
     
     timeDomain.assign(n_fft * 2, 0.0f); 
@@ -25,20 +25,18 @@ void FeatureExtractor::prepare(double dawSampleRate, int dawSamplesPerHop)
     std::fill(audioTailBuffer.begin(), audioTailBuffer.end(), 0.0f);
     std::fill(logMelFeatures.begin(), logMelFeatures.end(), 0.0f);
     
-    // Reset our tail tracker on playback start
+    // Reset tail tracker on playback start
     numSamplesInTail = 0; 
 }
 
 const std::vector<float>& FeatureExtractor::process(const float* hopData)
 {
-    // 1. Resample incoming 50ms hop
     double ratio = sourceSampleRate / static_cast<double>(targetSampleRate);
     resampler.process(ratio, hopData, resampledHopBuffer.data(), targetHopSamples);
 
-    // 2. Overlap-Save: Append new audio strictly after whatever tail is leftover
+    // Append new audio strictly after whatever tail 
     std::memcpy(audioTailBuffer.data() + numSamplesInTail, resampledHopBuffer.data(), targetHopSamples * sizeof(float));
 
-    // 3. Calculate how many NEW frames we can extract
     size_t totalAvailable = numSamplesInTail + targetHopSamples;
     size_t newFramesCount = 0;
     
@@ -46,7 +44,6 @@ const std::vector<float>& FeatureExtractor::process(const float* hopData)
         newFramesCount = ((totalAvailable - n_fft) / hop_length) + 1;
     }
 
-    // 4. Shift existing features left and compute new frames
     if (newFramesCount > 0) 
     {
         size_t framesToKeep = num_frames - newFramesCount;
@@ -83,15 +80,13 @@ const std::vector<float>& FeatureExtractor::process(const float* hopData)
                 }
                 
                 float logMel = 10.0f * std::log10(std::max(sum, 1e-10f));
-                
-                // Append to the end of the shifted row
                 size_t featureIdx = (m * num_frames) + (num_frames - newFramesCount + f);
                 logMelFeatures[featureIdx] = logMel;
             }
         }
     }
 
-    // 5. Update the dynamic tail for the NEXT process call
+    // Update tail for NEXT `process` call
     size_t consumedSamples = newFramesCount * hop_length;
     numSamplesInTail = totalAvailable - consumedSamples; // Accurately retain all uncalculated samples
     
