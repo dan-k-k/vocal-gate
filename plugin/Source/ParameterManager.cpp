@@ -18,7 +18,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ParameterManager::createPara
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"threshold", 1}, "P Threshold", 0.001f, 0.999f, 0.60f));
+        juce::ParameterID{"threshold", 1}, "Threshold", 0.001f, 0.999f, 0.65f));
 
     juce::NormalisableRange<float> floorRange (-100.0f, 0.0f, 0.1f);
     floorRange.setSkewForCentre (-18.0f);
@@ -49,7 +49,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ParameterManager::createPara
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"probsmoothing", 1}, "Smooth", probSmoothRange, 400.0f));
 
-    juce::NormalisableRange<float> gainRange (-12.0f, 12.0f, 0.1f);
+    juce::NormalisableRange<float> gainRange (-16.0f, 16.0f, 0.1f); 
     gainRange.setSkewForCentre (0.0f);
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"input_gain", 1}, "Input Gain", gainRange, 0.0f));
