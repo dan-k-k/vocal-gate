@@ -7,12 +7,12 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 </p>
 
 <p align="center">
-  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.3/VocalGate_Mac_Installer.pkg">
-    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.3-black?style=for-the-badge" alt="Download for macOS">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v4/VocalGate_Mac_Installer.pkg">
+    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.4-black?style=for-the-badge" alt="Download for macOS">
   </a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.3/VocalGate_Windows_Installer.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.3-blue?style=for-the-badge" alt="Download for Windows">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.4/VocalGate_Windows_Installer.exe">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.4-blue?style=for-the-badge" alt="Download for Windows">
   </a>
 </p>
 
