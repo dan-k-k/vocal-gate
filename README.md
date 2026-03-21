@@ -41,7 +41,7 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 * **Video Editing:** DaVinci Resolve, Adobe Premiere Pro, Final Cut Pro
 * **DAWs & Audio:** Reaper, Logic Pro, FL Studio, Ableton Live, Audacity
 
-> ⚠️ **IF RECORDING/STREAMING LIVE (OBS/Streamlabs/etc.):** The AI model requires a 750ms lookahead to work. You MUST delay your visual sources and desktop audio by 750ms to keep your broadcast perfectly in sync with your mic!
+> ⚠️ **IF RECORDING/STREAMING LIVE (OBS/Streamlabs/etc.):** The AI model requires a 750ms lookahead to work. You MUST delay your visual sources and desktop audio by 750ms to keep your broadcast in sync with your mic!
 > 
 > **E.g., How to sync in OBS:**
 > * **Webcams:** Right-click source -> *Filters* -> Add *Video Delay (Async)* -> set to 750ms.
