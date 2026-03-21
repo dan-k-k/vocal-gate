@@ -43,7 +43,7 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 
 > ⚠️ **IF RECORDING/STREAMING LIVE (OBS/Streamlabs):** The AI model requires a 750ms lookahead to work. You MUST delay your visual sources and desktop audio by 750ms to keep your broadcast perfectly in sync with your mic!
 > 
-> **e.g How to sync in OBS:**
+> **E.g., How to sync in OBS:**
 > * **Webcams:** Right-click source -> *Filters* -> Add *Video Delay (Async)* -> set to 750ms.
 > * **Game/Screen Capture:** Right-click source -> *Filters* -> Add *Render Delay*. (Note: OBS caps this at 500ms, so you must stack **two** Render Delay filters: one at 500ms and another at 250ms).
 > * **Desktop Audio:** Click the gear icon in the Audio Mixer -> *Advanced Audio Properties* -> find your Desktop Audio and set the *Sync Offset* to 750ms.
