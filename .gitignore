@@ -34,6 +34,7 @@ ml_pipeline/plot_dataset_energy.py
 ml_pipeline/yt_to_audio.py
 ml_pipeline/render_final_video.py
 ml_pipeline/check_labels.py
+ml_pipeline/render_local_mel.py
 
 # C++ / JUCE Plugin
 plugin/build/
