@@ -31,7 +31,7 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 </p>
 <p align="center"><i>Watch the full demo on YouTube</i></p>
 
-#### Supports popular services, including:
+#### Useful for popular services, including:
 * **Live Streaming:** Twitch, YouTube Live, Kick, Facebook Gaming
 * **Podcasting:** Spotify, Apple Podcasts, Patreon
 * **Video Content:** YouTube VODs, TikTok, Instagram Reels
