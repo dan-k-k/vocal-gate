@@ -19,11 +19,6 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Fetch Secret ONNX Model
-      uses: ./.github/actions/fetch-onnx
-      with:
-        pat_token: ${{ secrets.MODEL_REPO_PAT }}
-
     - name: Extract Version from Tag
       shell: bash
       run: |
@@ -93,11 +88,6 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Fetch Secret ONNX Model
-      uses: ./.github/actions/fetch-onnx
-      with:
-        pat_token: ${{ secrets.MODEL_REPO_PAT }}
-
     - name: Extract Version from Tag
       shell: bash
       run: |
@@ -150,6 +140,73 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: VocalGate_Mac_Installer.pkg
+        name: Vocal Gate ${{ github.ref_name }} 
+        draft: true
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build Linux VST3 Zip
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # JUCE requires these specific Linux audio/graphics packages to compile
+    - name: Install JUCE Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev libx11-dev libxinerama-dev libxext-dev libfreetype6-dev libwebkit2gtk-4.0-dev libglu1-mesa-dev libxcursor-dev zip
+
+    - name: Extract Version from Tag
+      shell: bash
+      run: |
+        if [ "${{ github.ref_type }}" = "tag" ]; then
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v}
+        else
+          VERSION="0.0.0"
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    # Download the Linux x64 version of ONNX Runtime
+    - name: Download Linux ONNX Runtime
+      run: |
+        mkdir -p plugin/onnxruntime/lib
+        mkdir -p plugin/onnxruntime/include
+        curl -L "https://github.com/microsoft/onnxruntime/releases/download/v1.24.2/onnxruntime-linux-x64-1.24.2.tgz" -o onnx_linux.tgz
+        tar -xzf onnx_linux.tgz
+        cp onnxruntime-linux-x64-1.24.2/lib/libonnxruntime.so* plugin/onnxruntime/lib/
+        cp -R onnxruntime-linux-x64-1.24.2/include/* plugin/onnxruntime/include/
+
+    - name: Configure CMake
+      run: cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release
+      env:
+        CI_VERSION: ${{ env.VERSION }}
+
+    - name: Build VST3
+      run: cmake --build build --config Release --target VocalGate_VST3 --parallel 4
+
+    # Zip the VST3 bundle
+    - name: Create Zip File
+      working-directory: build/VocalGate_artefacts/VST3
+      run: zip -r ../../../VocalGate_Linux.zip "Vocal Gate.vst3"
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VocalGate-Linux-Zip
+        path: VocalGate_Linux.zip
+
+    - name: Publish Linux Zip to GitHub Releases
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: VocalGate_Linux.zip
         name: Vocal Gate ${{ github.ref_name }} 
         draft: true
         prerelease: false

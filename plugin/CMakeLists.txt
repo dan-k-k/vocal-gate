@@ -146,7 +146,28 @@ elseif(WIN32)
             "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
             "$ENV{COMMONPROGRAMFILES}/VST3/Vocal Gate.vst3"
     )
-endif()
+
+elseif(UNIX AND NOT APPLE)
+    # Linux x64
+    target_link_libraries(VocalGate PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.so.1.24.2
+    )
+
+    set_target_properties(VocalGate_VST3 PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "$ORIGIN" 
+    )
+
+    add_custom_command(TARGET VocalGate_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.so.1.24.2"
+            "$<TARGET_FILE_DIR:VocalGate_VST3>/"
+            
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "$<TARGET_FILE_DIR:VocalGate_VST3>/../.."
+            "$ENV{HOME}/.vst3/Vocal Gate.vst3"
+    )
+endif() 
 
 # CTest
 enable_testing()
