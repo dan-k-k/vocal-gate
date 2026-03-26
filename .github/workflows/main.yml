@@ -165,7 +165,6 @@ jobs:
         unzip pluginval.zip
         chmod +x pluginval
 
-    # Use xvfb-run to simulate a display server, since the Ubuntu runner is headless
     - name: Run pluginval Integration Test
       run: |
         xvfb-run -a ./pluginval \

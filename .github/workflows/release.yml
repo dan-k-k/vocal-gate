@@ -156,7 +156,7 @@ jobs:
       with:
         submodules: recursive
 
-    # JUCE requires these specific Linux audio/graphics packages to compile
+    # JUCE-required Linux audio/graphics packages
     - name: Install JUCE Dependencies
       run: |
         sudo apt-get update
