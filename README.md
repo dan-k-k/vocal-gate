@@ -1,6 +1,6 @@
-## Vocal Gate VST3 & AU (Free) ![GitHub All Releases](https://img.shields.io/github/downloads/dan-k-k/vocal-gate/total?style=flat-square)
+## Vocal Gate VST3 & AU (Free) 
 
-Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Can be used as: a **cough remover** in your podcast/Youtube video editor, a **sneeze ducker** in your Twitch live stream broadcaster, or a **filter** to block keyboard clicks and heavy breathing in your recording software.
+Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Can be used as: a **cough remover** in your podcast/Youtube video editor, a **sneeze ducker** in your Twitch live stream broadcaster, or a **filter** to block keyboard clicks and heavy breathing in your recording software. ![GitHub All Releases](https://img.shields.io/github/downloads/dan-k-k/vocal-gate/total?style=flat-square)
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="Free AI Noise Gate VST3 removing coughs and sneezes in real time" width="500">
@@ -21,7 +21,7 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 </p>
 
 <p align="center">
-  <small><b>Requires:</b> macOS 11+ (M-series) &nbsp;|&nbsp; Windows 10+ (64-bit) &nbsp;|&nbsp; Linux (Ubuntu 22.04+ / x64) | <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i></small><br>
+  <small><b>Requires:</b> macOS 11+ (M-series) &nbsp;|&nbsp; Windows 10+ (x64) &nbsp;|&nbsp; Linux (Ubuntu 22.04+ / x64) | <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i></small><br>
   <small><i>Note: Installers are unsigned. On macOS, right-click Open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'. On Linux, extract the .zip and place the .vst3 folder into <code>~/.vst3/</code>.</i></small>
 </p>
 
