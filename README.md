@@ -1,6 +1,8 @@
 ## Vocal Gate VST3 & AU (Free) 
-
-Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Can be used as: a **cough remover** in your podcast/Youtube video editor, a **sneeze ducker** in your Twitch live stream broadcaster, or a **filter** to block keyboard clicks and heavy breathing in your recording software. ![GitHub All Releases](https://img.shields.io/github/downloads/dan-k-k/vocal-gate/total?style=flat-square)
+<a href="https://github.com/dan-k-k/vocal-gate/releases">
+  <img align="right" src="https://img.shields.io/github/downloads/dan-k-k/vocal-gate/total?style=flat-square" alt="Total Downloads">
+</a>
+Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Can be used as: a **cough remover** in your podcast/Youtube video editor, a **sneeze ducker** in your Twitch live stream broadcaster, or a **filter** to block keyboard clicks and heavy breathing in your recording software. 
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="Free AI Noise Gate VST3 removing coughs and sneezes in real time" width="500">
