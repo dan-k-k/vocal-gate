@@ -193,8 +193,8 @@ jobs:
 
     # Zip the VST3 bundle
     - name: Create Zip File
-      working-directory: build/VocalGate_artefacts/VST3
-      run: zip -r ../../../VocalGate_Linux.zip "Vocal Gate.vst3"
+      working-directory: build/VocalGate_artefacts/Release/VST3
+      run: zip -r ../../../../VocalGate_Linux.zip "Vocal Gate.vst3"
 
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4
