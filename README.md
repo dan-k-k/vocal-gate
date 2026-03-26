@@ -1,25 +1,32 @@
 ## Vocal Gate VST3 & AU (Free)
+![GitHub All Releases](https://img.shields.io/github/downloads/dan-k-k/vocal-gate/total?style=flat-square)
 
-Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Whether you need an automatic cough remover for your podcast/Youtube video, a sneeze ducker for your Twitch live stream, or a smart filter to block keyboard clicks and heavy breathing, this plugin processes your audio in real-time. 
+Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean speech from unwanted microphone artifacts. This plugin is intended for Creators and Editors. Can be used as a:
+- cough remover for your podcast/Youtube video, 
+- sneeze ducker for your Twitch live stream, or
+- a smart filter to block keyboard clicks and heavy breathing. 
 
 <p align="center">
   <img src="images/LogMel_Plugin_Demo1.gif" alt="Free AI Noise Gate VST3 removing coughs and sneezes in real time" width="500">
 </p>
 
 <p align="center">
-  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.4/VocalGate_Mac_Installer.pkg">
-    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.4-black?style=for-the-badge" alt="Download for macOS">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.5/VocalGate_Mac_Installer.pkg">
+    <img src="https://img.shields.io/badge/Download_for_macOS-v1.0.5-black?style=for-the-badge" alt="Download for macOS">
   </a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.4/VocalGate_Windows_Installer.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.4-blue?style=for-the-badge" alt="Download for Windows">
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.5/VocalGate_Windows_Installer.exe">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.5-blue?style=for-the-badge" alt="Download for Windows">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/dan-k-k/vocal-gate/releases/download/v1.0.5/VocalGate_Linux.zip">
+    <img src="https://img.shields.io/badge/Download_for_Linux-v1.0.5-orange?style=for-the-badge" alt="Download for Linux">
   </a>
 </p>
 
 <p align="center">
-  <small><b>Requires:</b> macOS 11+ (M-series) &nbsp;|&nbsp; Windows 10+ (64-bit) | <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i>
-</small><br>
-  <small><i>Note: This installer is unsigned. On macOS, right-click open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'.</small></i>
+  <small><b>Requires:</b> macOS 11+ (M-series) &nbsp;|&nbsp; Windows 10+ (64-bit) &nbsp;|&nbsp; Linux (Ubuntu 22.04+ / x64) | <i><a href="https://github.com/dan-k-k/vocal-gate/releases/">Release notes</a></i></small><br>
+  <small><i>Note: Installers are unsigned. On macOS, right-click Open the installer in your downloads. On Windows, press 'More info' and 'Run anyway'. On Linux, extract the .zip and place the .vst3 folder into <code>~/.vst3/</code>.</i></small>
 </p>
 
 ### Real-World Use Examples
