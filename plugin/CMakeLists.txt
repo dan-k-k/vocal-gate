@@ -159,6 +159,11 @@ elseif(UNIX AND NOT APPLE)
     )
 
     add_custom_command(TARGET VocalGate_VST3 POST_BUILD
+        # Copy the base file
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.so"
+            "$<TARGET_FILE_DIR:VocalGate_VST3>/"
+        # Copy the versioned file
         COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime/lib/libonnxruntime.so.1.24.2"
             "$<TARGET_FILE_DIR:VocalGate_VST3>/"

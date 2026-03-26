@@ -155,6 +155,10 @@ jobs:
     - name: Build VST3 Plugin
       run: cmake --build build --target VocalGate_VST3 --parallel 4 
 
+    - name: Check Shared Library Dependencies
+      run: |
+        ldd "build/VocalGate_artefacts/VST3/Vocal Gate.vst3/Contents/x86_64-linux/Vocal Gate.so"
+
     - name: Download and Setup pluginval
       run: |
         curl -L "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip" -o pluginval.zip
@@ -164,7 +168,7 @@ jobs:
     # Use xvfb-run to simulate a display server, since the Ubuntu runner is headless
     - name: Run pluginval Integration Test
       run: |
-        xvfb-run ./pluginval \
+        xvfb-run -a ./pluginval \
           --strictness-level 5 \
           --validate-in-process \
           --validate "build/VocalGate_artefacts/VST3/Vocal Gate.vst3"
