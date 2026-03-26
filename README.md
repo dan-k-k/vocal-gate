@@ -54,11 +54,15 @@ Vocal Gate is a free AI noise gate VST3/AU plugin trained to separate clean spee
 ---
 
 ## Model Performance
-
 The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time inference in just ~0.3 ms per buffer. 
-
 <p align="center">
   <img src="images/AI_Inference.png" alt="AI_Inference" width="500">
+</p>
+
+### ROC 
+The pruned and quantised model has better performance in both inference time and ability on the test set (it is better generalised).
+<p align="center">
+  <img src="images/roc_curve_comparison1.png" alt="roc_curve_comparison" width="500">
 </p>
 
 ### Dataset Energies
@@ -69,11 +73,5 @@ The plugin relies on a pruned and quantised int8 ONNX model to achieve real-time
 ### Training Loss 
 <p align="center">
   <img src="images/loss_curve.png" alt="loss_curve" width="500">
-</p>
-
-### ROC 
-The pruned and quantised model has better performance in both inference time and ability on the test set (it is better generalised).
-<p align="center">
-  <img src="images/roc_curve_comparison1.png" alt="roc_curve_comparison" width="500">
 </p>
 
