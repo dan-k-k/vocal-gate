@@ -44,7 +44,7 @@ def plot_training_curve(csv_file="training_log.csv", output_img="loss_curve.png"
     
     plt.subplots_adjust(bottom=0.15) 
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
-    print(f"📈 Loss curve saved to: '{out_path}'")
+    print(f"Loss curve saved to: '{out_path}'")
     plt.close()
 
 def save_audio_and_features(waveform, log_mel, sample_rate, label):

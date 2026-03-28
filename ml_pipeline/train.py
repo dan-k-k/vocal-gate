@@ -34,7 +34,7 @@ def train():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-    print(f"🚀 Training on device: {device}.")
+    print(f"Training on device: {device}.")
 
     batch_size = 128
     epochs = 60 
